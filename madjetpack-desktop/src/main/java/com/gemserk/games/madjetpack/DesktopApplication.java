@@ -43,7 +43,7 @@ public class DesktopApplication {
 
 		LwjglApplicationConfiguration config = new LwjglApplicationConfiguration();
 
-		config.title = "Gemserk's Vampire Runner";
+		config.title = "Gemserk's Mad JetPack";
 		config.width = arguments.width;
 		config.height = arguments.height;
 		config.fullscreen = false;

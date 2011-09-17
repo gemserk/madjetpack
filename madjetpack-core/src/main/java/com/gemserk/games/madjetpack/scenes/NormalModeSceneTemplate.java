@@ -1,5 +1,7 @@
 package com.gemserk.games.madjetpack.scenes;
 
+import java.util.ArrayList;
+
 import com.artemis.Entity;
 import com.artemis.World;
 import com.badlogic.gdx.Gdx;
@@ -8,6 +10,8 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef.BodyType;
 import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
+import com.badlogic.gdx.physics.box2d.Filter;
+import com.badlogic.gdx.physics.box2d.Fixture;
 import com.gemserk.commons.artemis.WorldWrapper;
 import com.gemserk.commons.artemis.components.PhysicsComponent;
 import com.gemserk.commons.artemis.components.ScriptComponent;
@@ -36,6 +40,16 @@ import com.gemserk.resources.ResourceManager;
 
 public class NormalModeSceneTemplate {
 
+	static class CollisionBits {
+
+		public static final short ALL = 0xFF;
+		public static final short NONE = 0x00;
+
+		public static final short Character = 0x01;
+		public static final short Platform = 0x02;
+
+	}
+
 	static class Box2dRenderDebugScript extends ScriptJavaImpl {
 
 		private final Box2DDebugRenderer box2dDebugRenderer = new Box2DDebugRenderer();
@@ -55,10 +69,6 @@ public class NormalModeSceneTemplate {
 	}
 
 	static class CharacterControllerScript extends ScriptJavaImpl {
-
-		public CharacterControllerScript() {
-
-		}
 
 		@Override
 		public void update(World world, Entity e) {
@@ -87,6 +97,42 @@ public class NormalModeSceneTemplate {
 
 	}
 
+	static class DisablePlatformCollisionWhenGoingUpScript extends ScriptJavaImpl {
+
+		@Override
+		public void update(World world, Entity e) {
+
+			PhysicsComponent physicsComponent = e.getComponent(PhysicsComponent.class);
+
+			Body body = physicsComponent.getBody();
+			
+			Vector2 linearVelocity = body.getLinearVelocity();
+			
+			boolean goingUp = linearVelocity.y > 0f;
+
+			ArrayList<Fixture> fixtureList = body.getFixtureList();
+
+			for (int i = 0; i < fixtureList.size(); i++) {
+				Fixture fixture = fixtureList.get(i);
+
+				String fixtureId = (String) fixture.getUserData();
+
+				if (!"CharacterBase".equals(fixtureId))
+					continue;
+				
+				Filter filterData = fixture.getFilterData();
+				
+				if (goingUp)
+					filterData.maskBits = CollisionBits.NONE;
+				else
+					filterData.maskBits = CollisionBits.ALL;
+				
+				fixture.setFilterData(filterData);
+			}
+		}
+
+	}
+
 	class Box2dDebugRendererTemplate extends EntityTemplateImpl {
 
 		@Override
@@ -107,9 +153,13 @@ public class NormalModeSceneTemplate {
 
 			Body body = bodyBuilder //
 					.fixture(bodyBuilder.fixtureDefBuilder() //
-							.boxShape(width * 0.5f, height * 0.5f)) //
+							.categoryBits(CollisionBits.Character) //
+							.maskBits(CollisionBits.NONE).boxShape(width * 0.5f, height * 0.5f), //
+							"CharacterBody") //
 					.fixture(bodyBuilder.fixtureDefBuilder() //
-							.circleShape(new Vector2(0f, -0.75f), width * 0.5f)) //
+							.categoryBits(CollisionBits.Character) //
+							.maskBits(CollisionBits.ALL).circleShape(new Vector2(0f, -0.75f), width * 0.5f), //
+							"CharacterBase") //
 					.position(2f, 3f) //
 					.type(BodyType.DynamicBody) //
 					.fixedRotation() //
@@ -117,7 +167,32 @@ public class NormalModeSceneTemplate {
 					.build();
 
 			entity.addComponent(new PhysicsComponent(new PhysicsImpl(body)));
-			entity.addComponent(new ScriptComponent(new CharacterControllerScript()));
+			entity.addComponent(new ScriptComponent(new CharacterControllerScript(), //
+					new DisablePlatformCollisionWhenGoingUpScript()
+					));
+
+		}
+	}
+
+	class StaticPlatformTemplate extends EntityTemplateImpl {
+
+		@Override
+		public void apply(Entity entity) {
+
+			Vector2 position = parameters.get("position");
+
+			Float width = parameters.get("width");
+			Float height = parameters.get("height");
+
+			Body body = bodyBuilder //
+					.fixture(bodyBuilder.fixtureDefBuilder() //
+							.boxShape(width * 0.5f, height * 0.5f)) //
+					.position(position.x, position.y) //
+					.type(BodyType.StaticBody) //
+					.userData(entity) //
+					.build();
+
+			entity.addComponent(new PhysicsComponent(new PhysicsImpl(body)));
 
 		}
 	}
@@ -133,6 +208,7 @@ public class NormalModeSceneTemplate {
 
 	EntityTemplate box2dDebugRendererTemplate = new Box2dDebugRendererTemplate();
 	EntityTemplate characterTemplate = new CharacterTemplate();
+	EntityTemplate staticPlatformTemplate = new StaticPlatformTemplate();
 
 	private BodyBuilder bodyBuilder;
 
@@ -150,7 +226,7 @@ public class NormalModeSceneTemplate {
 
 		Libgdx2dCamera worldCamera = new Libgdx2dCameraTransformImpl();
 
-		worldCamera.zoom(64f);
+		worldCamera.zoom(48f);
 
 		renderLayers.add(Layers.World, new RenderLayerSpriteBatchImpl(-100, 100, worldCamera));
 
@@ -171,26 +247,29 @@ public class NormalModeSceneTemplate {
 				.put("physicsWorld", physicsWorld) //
 				);
 
-		bodyBuilder //
-				.fixture(bodyBuilder.fixtureDefBuilder() //
-						.boxShape(30f, 0.5f)) //
-				.position(15f, 0.5f) //
-				.type(BodyType.StaticBody) //
-				.build();
+		entityFactory.instantiate(staticPlatformTemplate, new ParametersWrapper() //
+				.put("position", new Vector2(15f, 0.5f)) //
+				.put("width", 60f) //
+				.put("height", 1f) //
+				);
 
-		bodyBuilder //
-				.fixture(bodyBuilder.fixtureDefBuilder() //
-						.boxShape(1f, 0.1f)) //
-				.position(8f, 3.5f) //
-				.type(BodyType.StaticBody) //
-				.build();
+		entityFactory.instantiate(staticPlatformTemplate, new ParametersWrapper() //
+				.put("position", new Vector2(8f, 3.5f)) //
+				.put("width", 2f) //
+				.put("height", 0.2f) //
+				);
 
-		bodyBuilder //
-				.fixture(bodyBuilder.fixtureDefBuilder() //
-						.boxShape(1f, 0.1f)) //
-				.position(4f, 4.5f) //
-				.type(BodyType.StaticBody) //
-				.build();
+		entityFactory.instantiate(staticPlatformTemplate, new ParametersWrapper() //
+				.put("position", new Vector2(4f, 4.5f)) //
+				.put("width", 2f) //
+				.put("height", 0.2f) //
+				);
+
+		entityFactory.instantiate(staticPlatformTemplate, new ParametersWrapper() //
+				.put("position", new Vector2(12f, 4.5f)) //
+				.put("width", 2f) //
+				.put("height", 0.2f) //
+				);
 
 		entityFactory.instantiate(characterTemplate);
 
