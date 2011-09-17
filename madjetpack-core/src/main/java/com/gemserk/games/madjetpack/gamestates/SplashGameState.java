@@ -108,7 +108,7 @@ public class SplashGameState extends com.gemserk.commons.gdx.gamestates.LoadingG
 	}
 
 	private void mainMenu() {
-		game.transition(game.getMainMenuScreen()) //
+		game.transition(game.getPlayGameScreen()) //
 				.leaveTime(1500) //
 				.disposeCurrent() //
 				.start();
@@ -116,7 +116,6 @@ public class SplashGameState extends com.gemserk.commons.gdx.gamestates.LoadingG
 
 	@Override
 	public void render() {
-
 		Gdx.graphics.getGL10().glClear(GL10.GL_COLOR_BUFFER_BIT);
 		spriteBatch.begin();
 		gemserkLogoBlur.setColor(blurColor);
@@ -145,7 +144,7 @@ public class SplashGameState extends com.gemserk.commons.gdx.gamestates.LoadingG
 
 	@Override
 	public void resume() {
-		Gdx.input.setCatchBackKey(false);
+		Gdx.input.setCatchBackKey(true);
 	}
 
 	@Override

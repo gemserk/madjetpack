@@ -29,6 +29,7 @@ import com.gemserk.componentsengine.input.LibgdxInputMappingBuilder;
 import com.gemserk.componentsengine.utils.Parameters;
 import com.gemserk.componentsengine.utils.ParametersWrapper;
 import com.gemserk.games.madjetpack.gamestates.MainMenuGameState;
+import com.gemserk.games.madjetpack.gamestates.PlayGameState;
 import com.gemserk.games.madjetpack.gamestates.SplashGameState;
 import com.gemserk.games.madjetpack.preferences.GamePreferences;
 import com.gemserk.games.madjetpack.resources.GameResources;
@@ -78,6 +79,10 @@ public class Game extends com.gemserk.commons.gdx.Game {
 
 	public Screen getMainMenuScreen() {
 		return mainMenuScreen;
+	}
+	
+	public Screen getPlayGameScreen() {
+		return playGameScreen;
 	}
 
 	public Parameters getGameData() {
@@ -131,9 +136,13 @@ public class Game extends com.gemserk.commons.gdx.Game {
 
 		SplashGameState splashGameState = new SplashGameState(this);
 		splashGameState.setResourceManager(resourceManager);
+		
+		PlayGameState playGameState = new PlayGameState(this);
+		playGameState.setResourceManager(resourceManager);
 
 		splashScreen = new ScreenImpl(splashGameState);
 		mainMenuScreen = new ScreenImpl(mainMenuGameState);
+		playGameScreen = new ScreenImpl(playGameState);
 
 		EventListenerReflectionRegistrator registrator = new EventListenerReflectionRegistrator(eventManager);
 
@@ -189,6 +198,7 @@ public class Game extends com.gemserk.commons.gdx.Game {
 	}
 
 	private boolean withTransition = false;
+	private Screen playGameScreen;
 
 	public class TransitionBuilder {
 
