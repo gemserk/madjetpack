@@ -15,10 +15,12 @@ import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
 import com.badlogic.gdx.physics.box2d.Filter;
 import com.badlogic.gdx.physics.box2d.Fixture;
 import com.gemserk.commons.artemis.WorldWrapper;
+import com.gemserk.commons.artemis.components.LinearVelocityLimitComponent;
 import com.gemserk.commons.artemis.components.OwnerComponent;
 import com.gemserk.commons.artemis.components.PhysicsComponent;
 import com.gemserk.commons.artemis.components.ScriptComponent;
 import com.gemserk.commons.artemis.components.SpatialComponent;
+import com.gemserk.commons.artemis.components.TagComponent;
 import com.gemserk.commons.artemis.events.EventManager;
 import com.gemserk.commons.artemis.events.EventManagerImpl;
 import com.gemserk.commons.artemis.render.RenderLayers;
@@ -44,7 +46,9 @@ import com.gemserk.commons.gdx.games.SpatialPhysicsImpl;
 import com.gemserk.componentsengine.utils.ParametersWrapper;
 import com.gemserk.games.madjetpack.GameInformation;
 import com.gemserk.games.madjetpack.components.RenderScriptComponent;
+import com.gemserk.games.madjetpack.components.TargetComponent;
 import com.gemserk.games.madjetpack.components.WeaponComponent;
+import com.gemserk.games.madjetpack.entities.Tags;
 import com.gemserk.games.madjetpack.systems.RenderScriptSystem;
 import com.gemserk.resources.ResourceManager;
 
@@ -58,6 +62,7 @@ public class NormalModeSceneTemplate {
 		public static final short Character = 0x01;
 		public static final short Platform = 0x02;
 		public static final short Bullet = 0x04;
+		public static final short Alien = 0x08;
 
 	}
 
@@ -161,7 +166,7 @@ public class NormalModeSceneTemplate {
 
 			float width = 0.5f;
 			float height = 1.5f;
-
+			
 			Body body = bodyBuilder //
 					.fixture(bodyBuilder.fixtureDefBuilder() //
 							.categoryBits(CollisionBits.Character) //
@@ -177,6 +182,7 @@ public class NormalModeSceneTemplate {
 					.userData(entity) //
 					.build();
 
+			entity.addComponent(new TagComponent(Tags.Character));
 			entity.addComponent(new PhysicsComponent(new PhysicsImpl(body)));
 			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
 			entity.addComponent(new ScriptComponent(new CharacterControllerScript(), //
@@ -218,9 +224,9 @@ public class NormalModeSceneTemplate {
 
 		@Override
 		public void update(World world, Entity e) {
-			
+
 			bulletDuration -= GlobalTime.getDelta();
-			
+
 			if (bulletDuration <= 0f) {
 				e.delete();
 				return;
@@ -229,7 +235,7 @@ public class NormalModeSceneTemplate {
 			SpatialComponent spatialComponent = e.getComponent(SpatialComponent.class);
 			Spatial spatial = spatialComponent.getSpatial();
 
-			if (!bounds.contains(spatial.getX(), spatial.getY())) 
+			if (!bounds.contains(spatial.getX(), spatial.getY()))
 				e.delete();
 
 		}
@@ -253,7 +259,7 @@ public class NormalModeSceneTemplate {
 			Body body = bodyBuilder //
 					.fixture(bodyBuilder.fixtureDefBuilder() //
 							.categoryBits(CollisionBits.Bullet) //
-							.maskBits((short) (CollisionBits.ALL & ~CollisionBits.Character)) //
+							.maskBits((short) (CollisionBits.ALL & ~CollisionBits.Character & ~CollisionBits.Platform)) //
 							.friction(0f) //
 							.boxShape(width * 0.5f, height * 0.5f)) //
 					.position(position.x, position.y) //
@@ -289,7 +295,7 @@ public class NormalModeSceneTemplate {
 			WeaponComponent weaponComponent = e.getComponent(WeaponComponent.class);
 			float reloadTime = weaponComponent.getReloadTime();
 			reloadTime -= GlobalTime.getDelta();
-			
+
 			if (reloadTime <= 0f)
 				reloadTime = 0f;
 
@@ -370,6 +376,94 @@ public class NormalModeSceneTemplate {
 		}
 	}
 
+	static class AntiGravityScript extends ScriptJavaImpl {
+
+		private static final Vector2 antiGravity = new Vector2(0, 10f);
+		private final Vector2 tmp = new Vector2();
+
+		@Override
+		public void update(World world, Entity e) {
+			PhysicsComponent physicsComponent = e.getComponent(PhysicsComponent.class);
+			Body body = physicsComponent.getPhysics().getBody();
+
+			tmp.set(antiGravity).mul(body.getMass());
+
+			body.applyForceToCenter(tmp);
+		}
+
+	}
+	
+	static class FollowPlayerScript extends ScriptJavaImpl {
+		
+		// should be divided in two?
+		
+		private final Vector2 direction = new Vector2();
+		private final Vector2 force = new Vector2();
+
+		@Override
+		public void update(World world, Entity e) {
+			PhysicsComponent physicsComponent = e.getComponent(PhysicsComponent.class);
+			Body body = physicsComponent.getPhysics().getBody();
+			
+			TargetComponent targetComponent = e.getComponent(TargetComponent.class);
+			String targetTag = targetComponent.getEntityTag();
+			
+			Entity target = world.getTagManager().getEntity(targetTag);
+			
+			// if target not on world
+			if (target == null)
+				return;
+			
+			SpatialComponent targetSpatialComponent = target.getComponent(SpatialComponent.class);
+			Spatial targetSpatial = targetSpatialComponent.getSpatial();
+
+			SpatialComponent spatialComponent = e.getComponent(SpatialComponent.class);
+			Spatial spatial = spatialComponent.getSpatial();
+			
+			direction.set(targetSpatial.getX(), targetSpatial.getY());
+			direction.sub(spatial.getX(), spatial.getY());
+			direction.nor();
+			
+			force.set(direction);
+			force.mul(20f);
+			
+			body.applyForceToCenter(force);
+			
+		}
+
+	}
+
+	class AlienTemplate extends EntityTemplateImpl {
+
+		@Override
+		public void apply(Entity entity) {
+
+			Spatial spatial = parameters.get("spatial");
+
+			float width = spatial.getWidth();
+			float height = spatial.getHeight();
+
+			Body body = bodyBuilder //
+					.fixture(bodyBuilder.fixtureDefBuilder() //
+							.categoryBits(CollisionBits.Alien) //
+							.maskBits((short)(CollisionBits.ALL & ~CollisionBits.Platform)) //
+							.circleShape(width * 0.5f), //
+							"EnemyBody") //
+					.position(spatial.getX(), spatial.getY()) //
+					.type(BodyType.DynamicBody) //
+					.fixedRotation() //
+					.userData(entity) //
+					.build();
+
+			entity.addComponent(new PhysicsComponent(new PhysicsImpl(body)));
+			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
+			entity.addComponent(new ScriptComponent(new AntiGravityScript(), new FollowPlayerScript()));
+			entity.addComponent(new TargetComponent(Tags.Character));
+			entity.addComponent(new LinearVelocityLimitComponent(3f));
+
+		}
+	}
+
 	static class Layers {
 
 		static final String World = "World";
@@ -384,6 +478,7 @@ public class NormalModeSceneTemplate {
 	EntityTemplate staticPlatformTemplate = new StaticPlatformTemplate();
 	EntityTemplate bulletTemplate = new BulletTemplate();
 	EntityTemplate weaponTemplate = new WeaponTemplate();
+	EntityTemplate enemyTemplate = new AlienTemplate();
 
 	private BodyBuilder bodyBuilder;
 	private EntityFactory entityFactory;
@@ -454,6 +549,10 @@ public class NormalModeSceneTemplate {
 				.put("position", new Vector2(3f, 2f)) //
 				.put("owner", character) //
 				.put("camera", worldCamera) //
+				);
+
+		entityFactory.instantiate(enemyTemplate, new ParametersWrapper() //
+				.put("spatial", new SpatialImpl(7f, 3f, 0.5f, 0.5f, 0f)) //
 				);
 
 		Gdx.app.log(GameInformation.name, "Applying scene template...");
