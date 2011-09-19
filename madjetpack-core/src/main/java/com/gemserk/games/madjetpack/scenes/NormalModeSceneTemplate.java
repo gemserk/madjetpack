@@ -4,6 +4,7 @@ import java.util.ArrayList;
 
 import com.artemis.Entity;
 import com.artemis.World;
+import com.artemis.utils.ImmutableBag;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input.Buttons;
 import com.badlogic.gdx.Input.Keys;
@@ -15,7 +16,6 @@ import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
 import com.badlogic.gdx.physics.box2d.Filter;
 import com.badlogic.gdx.physics.box2d.Fixture;
 import com.gemserk.commons.artemis.WorldWrapper;
-import com.gemserk.commons.artemis.components.LinearVelocityLimitComponent;
 import com.gemserk.commons.artemis.components.OwnerComponent;
 import com.gemserk.commons.artemis.components.PhysicsComponent;
 import com.gemserk.commons.artemis.components.ScriptComponent;
@@ -37,17 +37,22 @@ import com.gemserk.commons.artemis.templates.EntityTemplate;
 import com.gemserk.commons.artemis.templates.EntityTemplateImpl;
 import com.gemserk.commons.gdx.GlobalTime;
 import com.gemserk.commons.gdx.box2d.BodyBuilder;
+import com.gemserk.commons.gdx.box2d.Contacts;
+import com.gemserk.commons.gdx.box2d.Contacts.Contact;
 import com.gemserk.commons.gdx.camera.Libgdx2dCamera;
 import com.gemserk.commons.gdx.camera.Libgdx2dCameraTransformImpl;
 import com.gemserk.commons.gdx.games.PhysicsImpl;
 import com.gemserk.commons.gdx.games.Spatial;
 import com.gemserk.commons.gdx.games.SpatialImpl;
 import com.gemserk.commons.gdx.games.SpatialPhysicsImpl;
+import com.gemserk.componentsengine.utils.Parameters;
 import com.gemserk.componentsengine.utils.ParametersWrapper;
+import com.gemserk.componentsengine.utils.timers.CountDownTimer;
 import com.gemserk.games.madjetpack.GameInformation;
 import com.gemserk.games.madjetpack.components.RenderScriptComponent;
 import com.gemserk.games.madjetpack.components.TargetComponent;
 import com.gemserk.games.madjetpack.components.WeaponComponent;
+import com.gemserk.games.madjetpack.entities.Groups;
 import com.gemserk.games.madjetpack.entities.Tags;
 import com.gemserk.games.madjetpack.systems.RenderScriptSystem;
 import com.gemserk.resources.ResourceManager;
@@ -105,7 +110,7 @@ public class NormalModeSceneTemplate {
 
 			Body body = physicsComponent.getBody();
 
-			body.applyForceToCenter(new Vector2(3f, 0f).mul(movementDirection.x));
+			body.applyForceToCenter(new Vector2(5f, 0f).mul(movementDirection.x));
 
 			// apply jetpack
 			body.applyForceToCenter(new Vector2(0f, 15f).mul(movementDirection.y));
@@ -166,7 +171,7 @@ public class NormalModeSceneTemplate {
 
 			float width = 0.5f;
 			float height = 1.5f;
-			
+
 			Body body = bodyBuilder //
 					.fixture(bodyBuilder.fixtureDefBuilder() //
 							.categoryBits(CollisionBits.Character) //
@@ -186,7 +191,9 @@ public class NormalModeSceneTemplate {
 			entity.addComponent(new PhysicsComponent(new PhysicsImpl(body)));
 			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
 			entity.addComponent(new ScriptComponent(new CharacterControllerScript(), //
-					new DisablePlatformCollisionWhenGoingUpScript()));
+					new DisablePlatformCollisionWhenGoingUpScript(), //
+					new LimitLinearVelocityScript(50f) //
+			));
 
 		}
 	}
@@ -267,6 +274,8 @@ public class NormalModeSceneTemplate {
 					.bullet() //
 					.userData(entity) //
 					.build();
+
+			entity.setGroup(Groups.Bullets);
 
 			entity.addComponent(new PhysicsComponent(new PhysicsImpl(body)));
 			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
@@ -392,11 +401,41 @@ public class NormalModeSceneTemplate {
 		}
 
 	}
-	
-	static class FollowPlayerScript extends ScriptJavaImpl {
-		
+
+	static class LimitLinearVelocityScript extends ScriptJavaImpl {
+
+		private final Vector2 tmp = new Vector2();
+		private final float speed;
+
+		public LimitLinearVelocityScript(float speed) {
+			this.speed = speed;
+		}
+
+		@Override
+		public void update(World world, Entity e) {
+			PhysicsComponent physicsComponent = e.getComponent(PhysicsComponent.class);
+			Body body = physicsComponent.getPhysics().getBody();
+
+			Vector2 linearVelocity = body.getLinearVelocity();
+
+			if (linearVelocity.len() > speed) {
+
+				float v = speed - linearVelocity.len();
+
+				tmp.set(linearVelocity).nor();
+				tmp.mul(v * body.getMass() / GlobalTime.getDelta());
+
+				body.applyForceToCenter(tmp);
+			}
+
+		}
+
+	}
+
+	static class FollowEntityScript extends ScriptJavaImpl {
+
 		// should be divided in two?
-		
+
 		private final Vector2 direction = new Vector2();
 		private final Vector2 force = new Vector2();
 
@@ -404,31 +443,57 @@ public class NormalModeSceneTemplate {
 		public void update(World world, Entity e) {
 			PhysicsComponent physicsComponent = e.getComponent(PhysicsComponent.class);
 			Body body = physicsComponent.getPhysics().getBody();
-			
+
 			TargetComponent targetComponent = e.getComponent(TargetComponent.class);
 			String targetTag = targetComponent.getEntityTag();
-			
+
 			Entity target = world.getTagManager().getEntity(targetTag);
-			
+
 			// if target not on world
 			if (target == null)
 				return;
-			
+
 			SpatialComponent targetSpatialComponent = target.getComponent(SpatialComponent.class);
 			Spatial targetSpatial = targetSpatialComponent.getSpatial();
 
 			SpatialComponent spatialComponent = e.getComponent(SpatialComponent.class);
 			Spatial spatial = spatialComponent.getSpatial();
-			
+
 			direction.set(targetSpatial.getX(), targetSpatial.getY());
 			direction.sub(spatial.getX(), spatial.getY());
 			direction.nor();
-			
+
 			force.set(direction);
-			force.mul(20f);
-			
+			force.mul(50f);
+
 			body.applyForceToCenter(force);
-			
+
+		}
+
+	}
+
+	static class RemoveWhenBulletCollision extends ScriptJavaImpl {
+
+		@Override
+		public void update(World world, Entity e) {
+			PhysicsComponent physicsComponent = e.getComponent(PhysicsComponent.class);
+
+			Contacts contacts = physicsComponent.getContact();
+			if (!contacts.isInContact())
+				return;
+
+			for (int i = 0; i < contacts.getContactCount(); i++) {
+				Contact contact = contacts.getContact(i);
+
+				Entity otherEntity = (Entity) contact.getOtherFixture().getBody().getUserData();
+				if (!Groups.Bullets.equals(world.getGroupManager().getGroupOf(otherEntity)))
+					continue;
+
+				otherEntity.delete();
+				e.delete();
+
+				return;
+			}
 		}
 
 	}
@@ -446,7 +511,7 @@ public class NormalModeSceneTemplate {
 			Body body = bodyBuilder //
 					.fixture(bodyBuilder.fixtureDefBuilder() //
 							.categoryBits(CollisionBits.Alien) //
-							.maskBits((short)(CollisionBits.ALL & ~CollisionBits.Platform)) //
+							.maskBits((short) (CollisionBits.ALL & ~CollisionBits.Platform)) //
 							.circleShape(width * 0.5f), //
 							"EnemyBody") //
 					.position(spatial.getX(), spatial.getY()) //
@@ -455,12 +520,61 @@ public class NormalModeSceneTemplate {
 					.userData(entity) //
 					.build();
 
+			entity.setGroup(Groups.Aliens);
+
 			entity.addComponent(new PhysicsComponent(new PhysicsImpl(body)));
 			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
-			entity.addComponent(new ScriptComponent(new AntiGravityScript(), new FollowPlayerScript()));
+			entity.addComponent(new ScriptComponent(new AntiGravityScript(), new FollowEntityScript(), new LimitLinearVelocityScript(2f), new RemoveWhenBulletCollision()));
 			entity.addComponent(new TargetComponent(Tags.Character));
-			entity.addComponent(new LinearVelocityLimitComponent(3f));
+			// entity.addComponent(new LinearVelocityLimitComponent(2f));
 
+		}
+	}
+
+	class SpawnerScript extends ScriptJavaImpl {
+
+		private final Parameters parameters = new ParametersWrapper();
+		private final CountDownTimer countDownTimer;
+
+		public SpawnerScript() {
+			countDownTimer = new CountDownTimer(2000, true);
+		}
+
+		@Override
+		public void update(World world, Entity e) {
+
+			if (!countDownTimer.update(world.getDelta()))
+				return;
+
+			countDownTimer.reset();
+
+			ImmutableBag<Entity> aliens = world.getGroupManager().getEntities(Groups.Aliens);
+
+			if (aliens.size() > 2)
+				return;
+
+			SpatialComponent spatialComponent = e.getComponent(SpatialComponent.class);
+			Spatial spatial = spatialComponent.getSpatial();
+
+			entityFactory.instantiate(enemyTemplate, parameters //
+					.put("spatial", new SpatialImpl(spatial.getX(), spatial.getY(), 0.5f, 0.5f, 0f)) //
+					);
+
+		}
+
+	}
+
+	class AlienSpawnerTemplate extends EntityTemplateImpl {
+
+		@Override
+		public void apply(Entity entity) {
+			Float x = parameters.get("x");
+			Float y = parameters.get("y");
+
+			entity.setGroup(Groups.AlienSpawner);
+
+			entity.addComponent(new SpatialComponent(new SpatialImpl(x, y, 0, 0, 0)));
+			entity.addComponent(new ScriptComponent(new SpawnerScript()));
 		}
 	}
 
@@ -479,6 +593,7 @@ public class NormalModeSceneTemplate {
 	EntityTemplate bulletTemplate = new BulletTemplate();
 	EntityTemplate weaponTemplate = new WeaponTemplate();
 	EntityTemplate enemyTemplate = new AlienTemplate();
+	EntityTemplate alienSpawnerTemplate = new AlienSpawnerTemplate();
 
 	private BodyBuilder bodyBuilder;
 	private EntityFactory entityFactory;
@@ -551,8 +666,13 @@ public class NormalModeSceneTemplate {
 				.put("camera", worldCamera) //
 				);
 
-		entityFactory.instantiate(enemyTemplate, new ParametersWrapper() //
-				.put("spatial", new SpatialImpl(7f, 3f, 0.5f, 0.5f, 0f)) //
+		// entityFactory.instantiate(enemyTemplate, new ParametersWrapper() //
+		// .put("spatial", new SpatialImpl(7f, 3f, 0.5f, 0.5f, 0f)) //
+		// );
+
+		entityFactory.instantiate(alienSpawnerTemplate, new ParametersWrapper() //
+				.put("x", 7f) //
+				.put("y", 3f) //
 				);
 
 		Gdx.app.log(GameInformation.name, "Applying scene template...");
