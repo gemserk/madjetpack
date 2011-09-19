@@ -18,8 +18,8 @@
 	<url>http://blog.gemserk.com</url>
 
 	<properties>
-		<webstartName>Ludum Dare 21 - Vampire Runner</webstartName>
-		<webstartDescription>Ludum Dare 21 - Vampire Runner</webstartDescription>
+		<webstartName>Gemserk's Mad Jetpac - Prototype</webstartName>
+		<webstartDescription>Gemserk's Mad Jetpac - Prototype</webstartDescription>
 		<webstartCodebase>http://www.gemserk.com/prototipos/${project.parent.artifactId}-latest/</webstartCodebase>
 
 		<!-- finalName>${project.artifactId}-${project.version}</finalName -->
