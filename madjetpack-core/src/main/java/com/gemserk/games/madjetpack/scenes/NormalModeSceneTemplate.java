@@ -101,7 +101,7 @@ public class NormalModeSceneTemplate {
 
 	}
 
-	static class CharacterControllerScript extends ScriptJavaImpl {
+	class CharacterControllerScript extends ScriptJavaImpl {
 
 		@Override
 		public void update(World world, Entity e) {
@@ -118,7 +118,7 @@ public class NormalModeSceneTemplate {
 				movementDirection.y += 1f;
 			}
 
-			PhysicsComponent physicsComponent = e.getComponent(PhysicsComponent.class);
+			PhysicsComponent physicsComponent = Components.physicsComponent(e);
 
 			Body body = physicsComponent.getBody();
 
@@ -126,6 +126,21 @@ public class NormalModeSceneTemplate {
 
 			// apply jetpack
 			body.applyForceToCenter(new Vector2(0f, 15f).mul(movementDirection.y));
+			
+			if (Gdx.input.isButtonPressed(Buttons.RIGHT)) {
+				
+				ShipPartComponent shipComponent = GameComponents.getShipComponent(e);
+				Entity part = shipComponent.getPart();
+				Joint joint = shipComponent.getJoint();
+				if (part == null)
+					return;
+				
+				shipComponent.setPart(null);
+				shipComponent.setJoint(null);
+				
+				physicsWorld.destroyJoint(joint);
+			}
+		
 		}
 
 	}
@@ -689,18 +704,10 @@ public class NormalModeSceneTemplate {
 
 			PhysicsComponent characterPhysicsComponent = Components.physicsComponent(character);
 
-			// Joint joint = jointBuilder.distanceJoint() //
-			// .bodyA(physicsComponent.getBody()) //
-			// .bodyB(characterPhysicsComponent.getBody()) //
-			// .length(1.5f) //
-			// // .dampingRatio(0.5f) //
-			// .frequencyHz(2f) //
-			// .build();
-
 			Joint joint = jointBuilder.ropeJointBuilder() //
 					.bodyA(physicsComponent.getBody(), 0f, 0f) //
 					.bodyB(characterPhysicsComponent.getBody(), 0f, 0f) //
-					.maxLength(2f) //
+					.maxLength(1.5f) //
 					.build();
 
 			shipComponent.setPart(e);
@@ -720,8 +727,7 @@ public class NormalModeSceneTemplate {
 
 			Vector2 position = parameters.get("position");
 
-			short maskBits = CollisionBits.Platform | CollisionBits.WorldBound;
-			// short maskBits = CollisionBits.ALL;
+			short maskBits = CollisionBits.Platform | CollisionBits.WorldBound | CollisionBits.Alien;
 			short sensorMaskBits = CollisionBits.Character;
 
 			Body body = bodyBuilder //
@@ -736,7 +742,7 @@ public class NormalModeSceneTemplate {
 							.categoryBits(CollisionBits.ShipPart) //
 							.maskBits(sensorMaskBits) //
 							.density(0f) //
-							.circleShape(new Vector2(0f, 0f), width * 3f), //
+							.circleShape(new Vector2(0f, 0f), width * 2f), //
 							"ShipPartSensor") //
 					.position(position.x, position.y) //
 					.type(BodyType.DynamicBody) //
@@ -781,6 +787,8 @@ public class NormalModeSceneTemplate {
 
 	private JointBuilder jointBuilder;
 
+	private com.badlogic.gdx.physics.box2d.World physicsWorld;
+
 	public void setResourceManager(ResourceManager<String> resourceManager) {
 		this.resourceManager = resourceManager;
 	}
@@ -792,7 +800,7 @@ public class NormalModeSceneTemplate {
 
 		Camera gameCamera = new CameraRestrictedImpl(0, 0, 48f, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), worldBounds);
 
-		com.badlogic.gdx.physics.box2d.World physicsWorld = new com.badlogic.gdx.physics.box2d.World(new Vector2(0f, -10f), false);
+		physicsWorld = new com.badlogic.gdx.physics.box2d.World(new Vector2(0f, -10f), false);
 		bodyBuilder = new BodyBuilder(physicsWorld);
 		jointBuilder = new JointBuilder(physicsWorld);
 
@@ -888,7 +896,11 @@ public class NormalModeSceneTemplate {
 				);
 
 		entityFactory.instantiate(shipPartTemplate, new ParametersWrapper() //
-				.put("position", new Vector2(5f, 5f)) //
+				.put("position", new Vector2(worldBounds.getWidth() * 0.25f, 5.2f)) //
+				);
+
+		entityFactory.instantiate(shipPartTemplate, new ParametersWrapper() //
+				.put("position", new Vector2(worldBounds.getWidth() * 0.75f, 5.2f)) //
 				);
 
 		entityFactory.instantiate(characterCameraTemplate, new ParametersWrapper() //
