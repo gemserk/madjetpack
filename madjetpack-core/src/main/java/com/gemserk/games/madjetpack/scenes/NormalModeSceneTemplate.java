@@ -689,10 +689,18 @@ public class NormalModeSceneTemplate {
 
 			PhysicsComponent characterPhysicsComponent = Components.physicsComponent(character);
 
-			Joint joint = jointBuilder.distanceJoint() //
-					.bodyA(physicsComponent.getBody()) //
-					.bodyB(characterPhysicsComponent.getBody()) //
-					.length(1.5f) //
+			// Joint joint = jointBuilder.distanceJoint() //
+			// .bodyA(physicsComponent.getBody()) //
+			// .bodyB(characterPhysicsComponent.getBody()) //
+			// .length(1.5f) //
+			// // .dampingRatio(0.5f) //
+			// .frequencyHz(2f) //
+			// .build();
+
+			Joint joint = jointBuilder.ropeJointBuilder() //
+					.bodyA(physicsComponent.getBody(), 0f, 0f) //
+					.bodyB(characterPhysicsComponent.getBody(), 0f, 0f) //
+					.maxLength(2f) //
 					.build();
 
 			shipComponent.setPart(e);
@@ -713,7 +721,7 @@ public class NormalModeSceneTemplate {
 			Vector2 position = parameters.get("position");
 
 			short maskBits = CollisionBits.Platform | CollisionBits.WorldBound;
-//			short maskBits = CollisionBits.ALL;
+			// short maskBits = CollisionBits.ALL;
 			short sensorMaskBits = CollisionBits.Character;
 
 			Body body = bodyBuilder //
