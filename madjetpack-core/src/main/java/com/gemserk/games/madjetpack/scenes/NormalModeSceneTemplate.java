@@ -16,6 +16,7 @@ import com.badlogic.gdx.physics.box2d.BodyDef.BodyType;
 import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
 import com.badlogic.gdx.physics.box2d.Filter;
 import com.badlogic.gdx.physics.box2d.Fixture;
+import com.badlogic.gdx.physics.box2d.Joint;
 import com.gemserk.commons.artemis.WorldWrapper;
 import com.gemserk.commons.artemis.components.ContainerComponent;
 import com.gemserk.commons.artemis.components.OwnerComponent;
@@ -41,6 +42,7 @@ import com.gemserk.commons.gdx.GlobalTime;
 import com.gemserk.commons.gdx.box2d.BodyBuilder;
 import com.gemserk.commons.gdx.box2d.Contacts;
 import com.gemserk.commons.gdx.box2d.Contacts.Contact;
+import com.gemserk.commons.gdx.box2d.JointBuilder;
 import com.gemserk.commons.gdx.camera.Camera;
 import com.gemserk.commons.gdx.camera.CameraRestrictedImpl;
 import com.gemserk.commons.gdx.camera.Libgdx2dCamera;
@@ -55,7 +57,9 @@ import com.gemserk.componentsengine.utils.timers.CountDownTimer;
 import com.gemserk.games.madjetpack.GameInformation;
 import com.gemserk.games.madjetpack.components.CameraComponent;
 import com.gemserk.games.madjetpack.components.Components;
+import com.gemserk.games.madjetpack.components.GameComponents;
 import com.gemserk.games.madjetpack.components.RenderScriptComponent;
+import com.gemserk.games.madjetpack.components.ShipPartComponent;
 import com.gemserk.games.madjetpack.components.TargetComponent;
 import com.gemserk.games.madjetpack.components.WeaponComponent;
 import com.gemserk.games.madjetpack.entities.Groups;
@@ -75,6 +79,7 @@ public class NormalModeSceneTemplate {
 		public static final short Bullet = 0x04;
 		public static final short Alien = 0x08;
 		public static final short WorldBound = 0x10;
+		public static final short ShipPart = 0x20;
 
 	}
 
@@ -202,6 +207,7 @@ public class NormalModeSceneTemplate {
 					new LimitLinearVelocityScript(50f) //
 			));
 			entity.addComponent(new ContainerComponent());
+			entity.addComponent(new ShipPartComponent());
 
 		}
 	}
@@ -643,6 +649,102 @@ public class NormalModeSceneTemplate {
 		}
 	}
 
+	class AttachShipPartToCharacterScript extends ScriptJavaImpl {
+
+		@Override
+		public void update(World world, Entity e) {
+
+			// check if the main character already contains a ship part...
+
+			Entity character = world.getTagManager().getEntity(Tags.Character);
+			if (character == null)
+				return;
+
+			ShipPartComponent shipComponent = GameComponents.getShipComponent(character);
+			if (shipComponent.getPart() != null)
+				return;
+
+			PhysicsComponent physicsComponent = Components.physicsComponent(e);
+			Contacts contacts = physicsComponent.getContact();
+
+			if (!contacts.isInContact())
+				return;
+
+			boolean inContactWithCharacter = false;
+			for (int i = 0; i < contacts.getContactCount(); i++) {
+				Contact contact = contacts.getContact(i);
+
+				String fixtureId = (String) contact.getMyFixture().getUserData();
+				if (!"ShipPartSensor".equals(fixtureId))
+					continue;
+
+				Entity otherEntity = (Entity) contact.getOtherFixture().getBody().getUserData();
+				if (otherEntity == null)
+					continue;
+				inContactWithCharacter = character == otherEntity;
+			}
+
+			if (!inContactWithCharacter)
+				return;
+
+			PhysicsComponent characterPhysicsComponent = Components.physicsComponent(character);
+
+			Joint joint = jointBuilder.distanceJoint() //
+					.bodyA(physicsComponent.getBody()) //
+					.bodyB(characterPhysicsComponent.getBody()) //
+					.length(1.5f) //
+					.build();
+
+			shipComponent.setPart(e);
+			shipComponent.setJoint(joint);
+
+		}
+
+	}
+
+	class ShipPartTemplate extends EntityTemplateImpl {
+
+		@Override
+		public void apply(Entity entity) {
+
+			float width = 0.25f;
+			float height = 0.25f;
+
+			Vector2 position = parameters.get("position");
+
+			short maskBits = CollisionBits.Platform | CollisionBits.WorldBound;
+//			short maskBits = CollisionBits.ALL;
+			short sensorMaskBits = CollisionBits.Character;
+
+			Body body = bodyBuilder //
+					.fixture(bodyBuilder.fixtureDefBuilder() //
+							.categoryBits(CollisionBits.ShipPart) //
+							.maskBits(maskBits) //
+							.density(0.1f) //
+							.circleShape(new Vector2(0f, 0f), width * 0.5f), //
+							"ShipPartBody") //
+					.fixture(bodyBuilder.fixtureDefBuilder() //
+							.sensor() //
+							.categoryBits(CollisionBits.ShipPart) //
+							.maskBits(sensorMaskBits) //
+							.density(0f) //
+							.circleShape(new Vector2(0f, 0f), width * 3f), //
+							"ShipPartSensor") //
+					.position(position.x, position.y) //
+					.type(BodyType.DynamicBody) //
+					.fixedRotation() //
+					.userData(entity) //
+					.build();
+
+			entity.setGroup(Groups.ShipParts);
+
+			entity.addComponent(new PhysicsComponent(new PhysicsImpl(body)));
+			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
+			entity.addComponent(new ScriptComponent(new AttachShipPartToCharacterScript()));
+		}
+
+	}
+
 	static class Layers {
 
 		static final String World = "World";
@@ -664,9 +766,12 @@ public class NormalModeSceneTemplate {
 	EntityTemplate alienSpawnerTemplate = new AlienSpawnerTemplate();
 	EntityTemplate cameraTemplate = new CameraTemplate();
 	EntityTemplate characterCameraTemplate = new CharacterCameraTemplate();
+	EntityTemplate shipPartTemplate = new ShipPartTemplate();
 
 	private BodyBuilder bodyBuilder;
 	private EntityFactory entityFactory;
+
+	private JointBuilder jointBuilder;
 
 	public void setResourceManager(ResourceManager<String> resourceManager) {
 		this.resourceManager = resourceManager;
@@ -675,12 +780,13 @@ public class NormalModeSceneTemplate {
 	public void apply(WorldWrapper scene) {
 		final EventManager eventManager = new EventManagerImpl();
 
-		final Rectangle worldBounds = new Rectangle(0, 0, 20f, 30f);
+		final Rectangle worldBounds = new Rectangle(0, 0, 20f, 20f);
 
 		Camera gameCamera = new CameraRestrictedImpl(0, 0, 48f, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), worldBounds);
 
 		com.badlogic.gdx.physics.box2d.World physicsWorld = new com.badlogic.gdx.physics.box2d.World(new Vector2(0f, -10f), false);
 		bodyBuilder = new BodyBuilder(physicsWorld);
+		jointBuilder = new JointBuilder(physicsWorld);
 
 		RenderLayers renderLayers = new RenderLayers();
 
@@ -726,32 +832,32 @@ public class NormalModeSceneTemplate {
 				.put("physicsWorld", physicsWorld) //
 				);
 
-		entityFactory.instantiate(staticPlatformTemplate, new ParametersWrapper() //
+		entityFactory.instantiate(worldBoundsTemplate, new ParametersWrapper() //
 				.put("position", new Vector2(15f, 0.5f)) //
 				.put("width", 60f) //
 				.put("height", 1f) //
 				);
 
 		entityFactory.instantiate(worldBoundsTemplate, new ParametersWrapper() //
-				.put("position", new Vector2(15f, worldBounds.getY() + worldBounds.getHeight() - 0.5f)) //
+				.put("position", new Vector2(15f, worldBounds.getY() + worldBounds.getHeight())) //
 				.put("width", 60f) //
 				.put("height", 0.1f) //
 				);
 
 		entityFactory.instantiate(staticPlatformTemplate, new ParametersWrapper() //
-				.put("position", new Vector2(8f, 3.5f)) //
+				.put("position", new Vector2(worldBounds.getWidth() * 0.5f, 3.5f)) //
 				.put("width", 2f) //
 				.put("height", 0.2f) //
 				);
 
 		entityFactory.instantiate(staticPlatformTemplate, new ParametersWrapper() //
-				.put("position", new Vector2(4f, 4.5f)) //
+				.put("position", new Vector2(worldBounds.getWidth() * 0.25f, 4.5f)) //
 				.put("width", 2f) //
 				.put("height", 0.2f) //
 				);
 
 		entityFactory.instantiate(staticPlatformTemplate, new ParametersWrapper() //
-				.put("position", new Vector2(12f, 4.5f)) //
+				.put("position", new Vector2(worldBounds.getWidth() * 0.75f, 4.5f)) //
 				.put("width", 2f) //
 				.put("height", 0.2f) //
 				);
@@ -771,6 +877,10 @@ public class NormalModeSceneTemplate {
 		entityFactory.instantiate(alienSpawnerTemplate, new ParametersWrapper() //
 				.put("x", 7f) //
 				.put("y", 3f) //
+				);
+
+		entityFactory.instantiate(shipPartTemplate, new ParametersWrapper() //
+				.put("position", new Vector2(5f, 5f)) //
 				);
 
 		entityFactory.instantiate(characterCameraTemplate, new ParametersWrapper() //

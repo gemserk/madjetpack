@@ -5,5 +5,6 @@ public class Groups {
 	public static final String Bullets = "Bullets";
 	public static final String Aliens = "Aliens";
 	public static final String AlienSpawner = "AlienSpawner";
+	public static final String ShipParts = "ShipParts";
 
 }
