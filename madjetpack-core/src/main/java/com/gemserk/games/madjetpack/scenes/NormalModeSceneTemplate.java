@@ -74,6 +74,7 @@ public class NormalModeSceneTemplate {
 		public static final short Platform = 0x02;
 		public static final short Bullet = 0x04;
 		public static final short Alien = 0x08;
+		public static final short WorldBound = 0x10;
 
 	}
 
@@ -150,7 +151,7 @@ public class NormalModeSceneTemplate {
 				Filter filterData = fixture.getFilterData();
 
 				if (goingUp)
-					filterData.maskBits = CollisionBits.NONE;
+					filterData.maskBits = CollisionBits.ALL & ~CollisionBits.Platform;
 				else
 					filterData.maskBits = CollisionBits.ALL;
 
@@ -181,7 +182,7 @@ public class NormalModeSceneTemplate {
 			Body body = bodyBuilder //
 					.fixture(bodyBuilder.fixtureDefBuilder() //
 							.categoryBits(CollisionBits.Character) //
-							.maskBits(CollisionBits.NONE).boxShape(width * 0.5f, height * 0.5f), //
+							.maskBits(CollisionBits.WorldBound).boxShape(width * 0.5f, height * 0.5f), //
 							"CharacterBody") //
 					.fixture(bodyBuilder.fixtureDefBuilder() //
 							.categoryBits(CollisionBits.Character) //
@@ -273,8 +274,9 @@ public class NormalModeSceneTemplate {
 			Body body = bodyBuilder //
 					.fixture(bodyBuilder.fixtureDefBuilder() //
 							.categoryBits(CollisionBits.Bullet) //
-							.maskBits((short) (CollisionBits.ALL & ~CollisionBits.Character & ~CollisionBits.Platform)) //
+							.maskBits((short) (CollisionBits.ALL & ~CollisionBits.Character)) //
 							.friction(0f) //
+							.restitution(0.6f) //
 							.boxShape(width * 0.5f, height * 0.5f)) //
 					.position(position.x, position.y) //
 					.type(BodyType.DynamicBody) //
@@ -372,15 +374,16 @@ public class NormalModeSceneTemplate {
 
 		@Override
 		public void apply(Entity entity) {
-
 			Vector2 position = parameters.get("position");
 
 			Float width = parameters.get("width");
 			Float height = parameters.get("height");
 
+			Short collisionBits = parameters.get("collisionBits", CollisionBits.Platform);
+
 			Body body = bodyBuilder //
 					.fixture(bodyBuilder.fixtureDefBuilder() //
-							.categoryBits(CollisionBits.Platform) //
+							.categoryBits(collisionBits) //
 							.boxShape(width * 0.5f, height * 0.5f)) //
 					.position(position.x, position.y) //
 					.type(BodyType.StaticBody) //
@@ -388,7 +391,14 @@ public class NormalModeSceneTemplate {
 					.build();
 
 			entity.addComponent(new PhysicsComponent(new PhysicsImpl(body)));
+		}
+	}
 
+	class WorldBoundsTemplate extends StaticPlatformTemplate {
+		@Override
+		public void apply(Entity e) {
+			parameters.put("collisionBits", CollisionBits.WorldBound);
+			super.apply(e);
 		}
 	}
 
@@ -626,7 +636,7 @@ public class NormalModeSceneTemplate {
 
 					CameraComponent cameraComponent = Components.cameraComponent(e);
 					Camera camera = cameraComponent.getCamera();
-					
+
 					camera.setPosition(spatial.getX(), spatial.getY());
 				}
 			});
@@ -644,7 +654,10 @@ public class NormalModeSceneTemplate {
 
 	EntityTemplate box2dDebugRendererTemplate = new Box2dDebugRendererTemplate();
 	EntityTemplate characterTemplate = new CharacterTemplate();
+
 	EntityTemplate staticPlatformTemplate = new StaticPlatformTemplate();
+	EntityTemplate worldBoundsTemplate = new WorldBoundsTemplate();
+
 	EntityTemplate bulletTemplate = new BulletTemplate();
 	EntityTemplate weaponTemplate = new WeaponTemplate();
 	EntityTemplate enemyTemplate = new AlienTemplate();
@@ -717,6 +730,12 @@ public class NormalModeSceneTemplate {
 				.put("position", new Vector2(15f, 0.5f)) //
 				.put("width", 60f) //
 				.put("height", 1f) //
+				);
+
+		entityFactory.instantiate(worldBoundsTemplate, new ParametersWrapper() //
+				.put("position", new Vector2(15f, worldBounds.getY() + worldBounds.getHeight() - 0.5f)) //
+				.put("width", 60f) //
+				.put("height", 0.1f) //
 				);
 
 		entityFactory.instantiate(staticPlatformTemplate, new ParametersWrapper() //
