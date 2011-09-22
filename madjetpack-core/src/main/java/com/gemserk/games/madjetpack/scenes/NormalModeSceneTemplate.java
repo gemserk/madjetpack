@@ -55,6 +55,7 @@ import com.gemserk.componentsengine.utils.Parameters;
 import com.gemserk.componentsengine.utils.ParametersWrapper;
 import com.gemserk.componentsengine.utils.timers.CountDownTimer;
 import com.gemserk.games.madjetpack.GameInformation;
+import com.gemserk.games.madjetpack.components.BoundsComponent;
 import com.gemserk.games.madjetpack.components.CameraComponent;
 import com.gemserk.games.madjetpack.components.Components;
 import com.gemserk.games.madjetpack.components.GameComponents;
@@ -474,7 +475,7 @@ public class NormalModeSceneTemplate {
 
 	}
 
-	static class FollowEntityScript extends ScriptJavaImpl {
+	class FollowEntityScript extends ScriptJavaImpl {
 
 		// should be divided in two?
 
@@ -494,6 +495,9 @@ public class NormalModeSceneTemplate {
 			// if target not on world
 			if (target == null)
 				return;
+			
+			Entity worldEntity = world.getTagManager().getEntity(Tags.World);
+			BoundsComponent boundsComponent = GameComponents.boundsComponent(worldEntity);
 
 			SpatialComponent targetSpatialComponent = target.getComponent(SpatialComponent.class);
 			Spatial targetSpatial = targetSpatialComponent.getSpatial();
@@ -503,6 +507,10 @@ public class NormalModeSceneTemplate {
 
 			direction.set(targetSpatial.getX(), targetSpatial.getY());
 			direction.sub(spatial.getX(), spatial.getY());
+			
+			if (direction.len() > boundsComponent.getBounds().getWidth() * 0.5f)
+				direction.x = -direction.x;
+			
 			direction.nor();
 
 			force.set(direction);
@@ -568,6 +576,8 @@ public class NormalModeSceneTemplate {
 			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
 			entity.addComponent(new ScriptComponent(new AntiGravityScript(), new FollowEntityScript(), new LimitLinearVelocityScript(2f), new RemoveWhenBulletCollision()));
 			entity.addComponent(new TargetComponent(Tags.Character));
+			entity.addComponent(new WorldWrapTeleportComponent());
+			
 			// entity.addComponent(new LinearVelocityLimitComponent(2f));
 
 		}
@@ -679,7 +689,7 @@ public class NormalModeSceneTemplate {
 			if (character == null)
 				return;
 
-			ShipPartComponent shipComponent = GameComponents.getShipPartComponent(character);
+			ShipPartComponent shipComponent = GameComponents.shipPartComponent(character);
 			if (shipComponent.getPart() != null)
 				return;
 
@@ -802,7 +812,7 @@ public class NormalModeSceneTemplate {
 					.maxLength(1f) //
 					.build();
 
-			ShipPartComponent shipComponent = GameComponents.getShipPartComponent(owner);
+			ShipPartComponent shipComponent = GameComponents.shipPartComponent(owner);
 
 			shipComponent.setPart(entity);
 			shipComponent.setJoint(joint);
@@ -821,7 +831,7 @@ public class NormalModeSceneTemplate {
 			if (character == null)
 				return;
 
-			ShipPartComponent shipPartComponent = GameComponents.getShipPartComponent(character);
+			ShipPartComponent shipPartComponent = GameComponents.shipPartComponent(character);
 			Entity shipPart = shipPartComponent.getPart();
 			if (shipPart == null)
 				return;
@@ -899,6 +909,17 @@ public class NormalModeSceneTemplate {
 		}
 
 	}
+	
+	class WorldTemplate extends EntityTemplateImpl {
+
+		@Override
+		public void apply(Entity entity) {
+			Rectangle bounds = parameters.get("bounds");
+			entity.addComponent(new TagComponent(Tags.World));
+			entity.addComponent(new BoundsComponent(bounds));
+		}
+		
+	}
 
 	static class Layers {
 
@@ -908,6 +929,8 @@ public class NormalModeSceneTemplate {
 
 	// @Inject
 	ResourceManager<String> resourceManager;
+	
+	EntityTemplate worldTemplate = new WorldTemplate();
 
 	EntityTemplate box2dDebugRendererTemplate = new Box2dDebugRendererTemplate();
 	EntityTemplate characterTemplate = new CharacterTemplate();
@@ -941,7 +964,7 @@ public class NormalModeSceneTemplate {
 		final EventManager eventManager = new EventManagerImpl();
 
 		final Rectangle worldBounds = new Rectangle(0, 0, 20f, 20f);
-
+		
 		Camera gameCamera = new CameraRestrictedImpl(0, 0, 48f, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), worldBounds);
 
 		physicsWorld = new com.badlogic.gdx.physics.box2d.World(new Vector2(0f, -10f), false);
@@ -987,6 +1010,9 @@ public class NormalModeSceneTemplate {
 		scene.init();
 
 		entityFactory = new EntityFactoryImpl(scene.getWorld());
+		
+		entityFactory.instantiate(worldTemplate, new ParametersWrapper().put("bounds", worldBounds));
+		
 		entityFactory.instantiate(box2dDebugRendererTemplate, new ParametersWrapper() //
 				.put("camera", worldCamera) //
 				.put("physicsWorld", physicsWorld) //
@@ -1030,14 +1056,10 @@ public class NormalModeSceneTemplate {
 				.put("camera", worldCamera) //
 				);
 
-		// entityFactory.instantiate(enemyTemplate, new ParametersWrapper() //
-		// .put("spatial", new SpatialImpl(7f, 3f, 0.5f, 0.5f, 0f)) //
-		// );
-
-		// entityFactory.instantiate(alienSpawnerTemplate, new ParametersWrapper() //
-		// .put("x", 7f) //
-		// .put("y", 3f) //
-		// );
+		entityFactory.instantiate(alienSpawnerTemplate, new ParametersWrapper() //
+				.put("x", worldBounds.getWidth() * 0.5f) //
+				.put("y", 8f) //
+				);
 
 		entityFactory.instantiate(shipPartTemplate, new ParametersWrapper() //
 				.put("position", new Vector2(worldBounds.getWidth() * 0.25f, 5.2f)) //

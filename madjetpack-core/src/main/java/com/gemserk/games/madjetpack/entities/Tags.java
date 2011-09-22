@@ -4,5 +4,6 @@ public class Tags {
 	
 	public static final String Character = "Character";
 	public static final String MainCamera = "MainCamera";
+	public static final String World = "World";
 
 }
