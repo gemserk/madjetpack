@@ -148,6 +148,20 @@ public class NormalModeSceneTemplate {
 
 	static class DisablePlatformCollisionWhenGoingUpScript extends ScriptJavaImpl {
 
+		short disabledMaskBits = CollisionBits.ALL & ~CollisionBits.Platform;
+		short enabledMaskBits = CollisionBits.ALL;
+		String fixtureId = "CharacterBase";
+		
+		public DisablePlatformCollisionWhenGoingUpScript(String fixtureId, short enabledMaskBits, short disabledMaskBits) {
+			this.fixtureId = fixtureId;
+			this.enabledMaskBits = enabledMaskBits;
+			this.disabledMaskBits = disabledMaskBits;
+		}
+		
+		public DisablePlatformCollisionWhenGoingUpScript() {
+			
+		}
+
 		@Override
 		public void update(World world, Entity e) {
 
@@ -166,15 +180,15 @@ public class NormalModeSceneTemplate {
 
 				String fixtureId = (String) fixture.getUserData();
 
-				if (!"CharacterBase".equals(fixtureId))
+				if (!fixtureId.equals(fixtureId))
 					continue;
 
 				Filter filterData = fixture.getFilterData();
 
-				if (goingUp)
-					filterData.maskBits = CollisionBits.ALL & ~CollisionBits.Platform;
-				else
-					filterData.maskBits = CollisionBits.ALL;
+				if (goingUp) {
+					filterData.maskBits = disabledMaskBits;
+				} else
+					filterData.maskBits = enabledMaskBits;
 
 				fixture.setFilterData(filterData);
 			}
@@ -314,7 +328,7 @@ public class NormalModeSceneTemplate {
 
 			entity.addComponent(new ScriptComponent(new BulletScript(direction), new RemoveBulletScript(worldBounds, bulletDuration)));
 			entity.addComponent(new WorldWrapTeleportComponent());
-			
+
 		}
 
 	}
@@ -705,16 +719,16 @@ public class NormalModeSceneTemplate {
 			if (!inContactWithCharacter)
 				return;
 
-			PhysicsComponent characterPhysicsComponent = Components.physicsComponent(character);
+			SpatialComponent spatialComponent = Components.spatialComponent(e);
+			Spatial spatial = spatialComponent.getSpatial();
 
-			Joint joint = jointBuilder.ropeJointBuilder() //
-					.bodyA(physicsComponent.getBody(), 0f, 0f) //
-					.bodyB(characterPhysicsComponent.getBody(), 0f, -0.7f) //
-					.maxLength(1f) //
-					.build();
+			entityFactory.instantiate(attachedShipPartTemplate, new ParametersWrapper() //
+					.put("owner", character) //
+					.put("position", spatial.getPosition()) //
+					);
 
-			shipComponent.setPart(e);
-			shipComponent.setJoint(joint);
+			e.delete();
+
 		}
 
 	}
@@ -758,7 +772,54 @@ public class NormalModeSceneTemplate {
 			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
 			entity.addComponent(new ScriptComponent(new AttachShipPartToCharacterScript()));
 			entity.addComponent(new WorldWrapTeleportComponent());
-			
+		}
+
+	}
+
+	class AttachedShipPartTemplate extends EntityTemplateImpl {
+
+		@Override
+		public void apply(Entity entity) {
+			float width = 0.25f;
+			float height = 0.25f;
+
+			Vector2 position = parameters.get("position");
+			Entity owner = parameters.get("owner");
+
+			short maskBits = CollisionBits.Platform | CollisionBits.WorldBound | CollisionBits.Alien;
+
+			Body body = bodyBuilder //
+					.fixture(bodyBuilder.fixtureDefBuilder() //
+							.categoryBits(CollisionBits.ShipPart) //
+							.maskBits(maskBits) //
+							.density(0.1f) //
+							.circleShape(new Vector2(0f, 0f), width * 0.5f), //
+							"ShipPartBody") //
+					.position(position.x, position.y) //
+					.type(BodyType.DynamicBody) //
+					.fixedRotation() //
+					.userData(entity) //
+					.build();
+
+			entity.setGroup(Groups.ShipParts);
+
+			entity.addComponent(new PhysicsComponent(new PhysicsImpl(body)));
+			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
+			entity.addComponent(new ScriptComponent(new DisablePlatformCollisionWhenGoingUpScript("ShipPartBody", 
+					maskBits, (short) (CollisionBits.WorldBound | CollisionBits.Alien))));
+
+			PhysicsComponent characterPhysicsComponent = Components.physicsComponent(owner);
+
+			Joint joint = jointBuilder.ropeJointBuilder() //
+					.bodyA(body, 0f, 0f) //
+					.bodyB(characterPhysicsComponent.getBody(), 0f, -0.7f) //
+					.maxLength(1f) //
+					.build();
+
+			ShipPartComponent shipComponent = GameComponents.getShipComponent(owner);
+
+			shipComponent.setPart(entity);
+			shipComponent.setJoint(joint);
 		}
 
 	}
@@ -785,6 +846,7 @@ public class NormalModeSceneTemplate {
 	EntityTemplate cameraTemplate = new CameraTemplate();
 	EntityTemplate characterCameraTemplate = new CharacterCameraTemplate();
 	EntityTemplate shipPartTemplate = new ShipPartTemplate();
+	EntityTemplate attachedShipPartTemplate = new AttachedShipPartTemplate();
 
 	private BodyBuilder bodyBuilder;
 	private EntityFactory entityFactory;
@@ -827,7 +889,7 @@ public class NormalModeSceneTemplate {
 			protected void process(Entity e) {
 				SpatialComponent spatialComponent = e.getComponent(SpatialComponent.class);
 				Spatial spatial = spatialComponent.getSpatial();
-				
+
 				float limit = worldBounds.getX() + worldBounds.getWidth();
 
 				if (spatial.getX() > limit) {
