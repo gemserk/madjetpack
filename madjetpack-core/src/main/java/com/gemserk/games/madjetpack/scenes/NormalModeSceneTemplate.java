@@ -17,6 +17,7 @@ import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
 import com.badlogic.gdx.physics.box2d.Filter;
 import com.badlogic.gdx.physics.box2d.Fixture;
 import com.gemserk.commons.artemis.WorldWrapper;
+import com.gemserk.commons.artemis.components.ContainerComponent;
 import com.gemserk.commons.artemis.components.OwnerComponent;
 import com.gemserk.commons.artemis.components.PhysicsComponent;
 import com.gemserk.commons.artemis.components.ScriptComponent;
@@ -199,6 +200,7 @@ public class NormalModeSceneTemplate {
 					new DisablePlatformCollisionWhenGoingUpScript(), //
 					new LimitLinearVelocityScript(50f) //
 			));
+			entity.addComponent(new ContainerComponent());
 
 		}
 	}
@@ -588,26 +590,46 @@ public class NormalModeSceneTemplate {
 		@Override
 		public void update(World world, Entity e) {
 			CameraComponent cameraComponent = Components.cameraComponent(e);
-
 			Camera camera = cameraComponent.getCamera();
 			Libgdx2dCamera libgdx2dCamera = cameraComponent.getLibgdx2dCamera();
-
 			libgdx2dCamera.zoom(camera.getZoom());
 			libgdx2dCamera.move(camera.getX(), camera.getY());
 		}
 
 	}
-	
-	class CameraTemplate extends EntityTemplateImpl {
 
+	class CameraTemplate extends EntityTemplateImpl {
 		@Override
 		public void apply(Entity entity) {
 			Camera camera = parameters.get("camera");
 			Libgdx2dCamera libgdxCamera = parameters.get("libgdxCamera");
 
+			entity.addComponent(new TagComponent(Tags.MainCamera));
 			entity.addComponent(new CameraComponent(camera, libgdxCamera));
 			entity.addComponent(new ScriptComponent(new UpdateCameraScript()));
-			entity.addComponent(new TagComponent(Tags.MainCamera));
+		}
+	}
+
+	class CharacterCameraTemplate extends CameraTemplate {
+		@Override
+		public void apply(Entity e) {
+			super.apply(e);
+			ScriptComponent scriptComponent = Components.scriptComponent(e);
+			scriptComponent.getScripts().add(new ScriptJavaImpl() {
+				@Override
+				public void update(World world, Entity e) {
+					Entity character = world.getTagManager().getEntity(Tags.Character);
+					if (character == null)
+						return;
+					SpatialComponent spatialComponent = Components.spatialComponent(character);
+					Spatial spatial = spatialComponent.getSpatial();
+
+					CameraComponent cameraComponent = Components.cameraComponent(e);
+					Camera camera = cameraComponent.getCamera();
+					
+					camera.setPosition(spatial.getX(), spatial.getY());
+				}
+			});
 		}
 	}
 
@@ -628,6 +650,7 @@ public class NormalModeSceneTemplate {
 	EntityTemplate enemyTemplate = new AlienTemplate();
 	EntityTemplate alienSpawnerTemplate = new AlienSpawnerTemplate();
 	EntityTemplate cameraTemplate = new CameraTemplate();
+	EntityTemplate characterCameraTemplate = new CharacterCameraTemplate();
 
 	private BodyBuilder bodyBuilder;
 	private EntityFactory entityFactory;
@@ -731,7 +754,7 @@ public class NormalModeSceneTemplate {
 				.put("y", 3f) //
 				);
 
-		entityFactory.instantiate(cameraTemplate, new ParametersWrapper() //
+		entityFactory.instantiate(characterCameraTemplate, new ParametersWrapper() //
 				.put("camera", gameCamera) //
 				.put("libgdxCamera", worldCamera) //
 				);
