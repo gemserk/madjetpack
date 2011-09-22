@@ -706,8 +706,8 @@ public class NormalModeSceneTemplate {
 
 			Joint joint = jointBuilder.ropeJointBuilder() //
 					.bodyA(physicsComponent.getBody(), 0f, 0f) //
-					.bodyB(characterPhysicsComponent.getBody(), 0f, 0f) //
-					.maxLength(1.5f) //
+					.bodyB(characterPhysicsComponent.getBody(), 0f, -0.7f) //
+					.maxLength(1f) //
 					.build();
 
 			shipComponent.setPart(e);
@@ -890,10 +890,10 @@ public class NormalModeSceneTemplate {
 		// .put("spatial", new SpatialImpl(7f, 3f, 0.5f, 0.5f, 0f)) //
 		// );
 
-		entityFactory.instantiate(alienSpawnerTemplate, new ParametersWrapper() //
-				.put("x", 7f) //
-				.put("y", 3f) //
-				);
+//		entityFactory.instantiate(alienSpawnerTemplate, new ParametersWrapper() //
+//				.put("x", 7f) //
+//				.put("y", 3f) //
+//				);
 
 		entityFactory.instantiate(shipPartTemplate, new ParametersWrapper() //
 				.put("position", new Vector2(worldBounds.getWidth() * 0.25f, 5.2f)) //
