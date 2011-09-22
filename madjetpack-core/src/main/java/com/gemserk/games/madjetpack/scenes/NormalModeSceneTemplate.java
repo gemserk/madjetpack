@@ -81,6 +81,7 @@ public class NormalModeSceneTemplate {
 		public static final short Alien = 0x08;
 		public static final short WorldBound = 0x10;
 		public static final short ShipPart = 0x20;
+		public static final short Ship = 0x40;
 
 	}
 
@@ -128,20 +129,6 @@ public class NormalModeSceneTemplate {
 			// apply jetpack
 			body.applyForceToCenter(new Vector2(0f, 15f).mul(movementDirection.y));
 
-			if (Gdx.input.isButtonPressed(Buttons.RIGHT)) {
-
-				ShipPartComponent shipComponent = GameComponents.getShipComponent(e);
-				Entity part = shipComponent.getPart();
-				Joint joint = shipComponent.getJoint();
-				if (part == null)
-					return;
-
-				shipComponent.setPart(null);
-				shipComponent.setJoint(null);
-
-				physicsWorld.destroyJoint(joint);
-			}
-
 		}
 
 	}
@@ -151,15 +138,15 @@ public class NormalModeSceneTemplate {
 		short disabledMaskBits = CollisionBits.ALL & ~CollisionBits.Platform;
 		short enabledMaskBits = CollisionBits.ALL;
 		String fixtureId = "CharacterBase";
-		
+
 		public DisablePlatformCollisionWhenGoingUpScript(String fixtureId, short enabledMaskBits, short disabledMaskBits) {
 			this.fixtureId = fixtureId;
 			this.enabledMaskBits = enabledMaskBits;
 			this.disabledMaskBits = disabledMaskBits;
 		}
-		
+
 		public DisablePlatformCollisionWhenGoingUpScript() {
-			
+
 		}
 
 		@Override
@@ -692,7 +679,7 @@ public class NormalModeSceneTemplate {
 			if (character == null)
 				return;
 
-			ShipPartComponent shipComponent = GameComponents.getShipComponent(character);
+			ShipPartComponent shipComponent = GameComponents.getShipPartComponent(character);
 			if (shipComponent.getPart() != null)
 				return;
 
@@ -766,7 +753,7 @@ public class NormalModeSceneTemplate {
 					.userData(entity) //
 					.build();
 
-			entity.setGroup(Groups.ShipParts);
+			// entity.setGroup(Groups.ShipParts);
 
 			entity.addComponent(new PhysicsComponent(new PhysicsImpl(body)));
 			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
@@ -786,7 +773,7 @@ public class NormalModeSceneTemplate {
 			Vector2 position = parameters.get("position");
 			Entity owner = parameters.get("owner");
 
-			short maskBits = CollisionBits.Platform | CollisionBits.WorldBound | CollisionBits.Alien;
+			short maskBits = CollisionBits.Platform | CollisionBits.WorldBound | CollisionBits.Alien | CollisionBits.Ship;
 
 			Body body = bodyBuilder //
 					.fixture(bodyBuilder.fixtureDefBuilder() //
@@ -805,8 +792,7 @@ public class NormalModeSceneTemplate {
 
 			entity.addComponent(new PhysicsComponent(new PhysicsImpl(body)));
 			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
-			entity.addComponent(new ScriptComponent(new DisablePlatformCollisionWhenGoingUpScript("ShipPartBody", 
-					maskBits, (short) (CollisionBits.WorldBound | CollisionBits.Alien))));
+			entity.addComponent(new ScriptComponent(new DisablePlatformCollisionWhenGoingUpScript("ShipPartBody", maskBits, (short) (CollisionBits.WorldBound | CollisionBits.Alien))));
 
 			PhysicsComponent characterPhysicsComponent = Components.physicsComponent(owner);
 
@@ -816,10 +802,100 @@ public class NormalModeSceneTemplate {
 					.maxLength(1f) //
 					.build();
 
-			ShipPartComponent shipComponent = GameComponents.getShipComponent(owner);
+			ShipPartComponent shipComponent = GameComponents.getShipPartComponent(owner);
 
 			shipComponent.setPart(entity);
 			shipComponent.setJoint(joint);
+		}
+
+	}
+
+	class RemoveShipPartScript extends ScriptJavaImpl {
+
+		@Override
+		public void update(World world, Entity e) {
+
+			// check if the main character already contains a ship part...
+
+			Entity character = world.getTagManager().getEntity(Tags.Character);
+			if (character == null)
+				return;
+
+			ShipPartComponent shipPartComponent = GameComponents.getShipPartComponent(character);
+			Entity shipPart = shipPartComponent.getPart();
+			if (shipPart == null)
+				return;
+
+			PhysicsComponent physicsComponent = Components.physicsComponent(e);
+			Contacts contacts = physicsComponent.getContact();
+
+			if (!contacts.isInContact())
+				return;
+
+			boolean inContactWithShipPart = false;
+			for (int i = 0; i < contacts.getContactCount(); i++) {
+				Contact contact = contacts.getContact(i);
+
+				String fixtureId = (String) contact.getMyFixture().getUserData();
+				if (!"ShipSensor".equals(fixtureId))
+					continue;
+
+				Entity otherEntity = (Entity) contact.getOtherFixture().getBody().getUserData();
+				if (otherEntity == null)
+					continue;
+
+				inContactWithShipPart = shipPart == otherEntity;
+			}
+
+			if (!inContactWithShipPart)
+				return;
+
+			shipPartComponent.setPart(null);
+			shipPartComponent.setJoint(null);
+
+			shipPart.delete();
+
+			// send event of ship part retrieved!!
+		}
+
+	}
+
+	class ShipTemplate extends EntityTemplateImpl {
+
+		@Override
+		public void apply(Entity entity) {
+
+			float width = 0.5f;
+			float height = 0.5f;
+
+			Vector2 position = parameters.get("position");
+
+			short maskBits = CollisionBits.Platform | CollisionBits.WorldBound;
+			short sensorMaskBits = CollisionBits.ShipPart;
+
+			Body body = bodyBuilder //
+					.fixture(bodyBuilder.fixtureDefBuilder() //
+							.categoryBits(CollisionBits.Ship) //
+							.maskBits(maskBits) //
+							.density(2f) //
+							.circleShape(new Vector2(0f, 0f), width * 0.5f), //
+							"ShipBody") //
+					.fixture(bodyBuilder.fixtureDefBuilder() //
+							.sensor() //
+							.categoryBits(CollisionBits.Ship) //
+							.maskBits(sensorMaskBits) //
+							.circleShape(new Vector2(0f, 0f), width * 3f), //
+							"ShipSensor") //
+					.position(position.x, position.y) //
+					.type(BodyType.DynamicBody) //
+					.fixedRotation() //
+					.userData(entity) //
+					.build();
+
+			entity.addComponent(new PhysicsComponent(new PhysicsImpl(body)));
+			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
+			entity.addComponent(new ScriptComponent(new RemoveShipPartScript()));
+
 		}
 
 	}
@@ -847,6 +923,8 @@ public class NormalModeSceneTemplate {
 	EntityTemplate characterCameraTemplate = new CharacterCameraTemplate();
 	EntityTemplate shipPartTemplate = new ShipPartTemplate();
 	EntityTemplate attachedShipPartTemplate = new AttachedShipPartTemplate();
+
+	EntityTemplate shipTemplate = new ShipTemplate();
 
 	private BodyBuilder bodyBuilder;
 	private EntityFactory entityFactory;
@@ -967,6 +1045,10 @@ public class NormalModeSceneTemplate {
 
 		entityFactory.instantiate(shipPartTemplate, new ParametersWrapper() //
 				.put("position", new Vector2(worldBounds.getWidth() * 0.75f, 5.2f)) //
+				);
+
+		entityFactory.instantiate(shipTemplate, new ParametersWrapper() //
+				.put("position", new Vector2(worldBounds.getWidth() * 0.5f, 1f)) //
 				);
 
 		entityFactory.instantiate(characterCameraTemplate, new ParametersWrapper() //

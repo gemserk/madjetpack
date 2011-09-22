@@ -7,7 +7,7 @@ public class GameComponents {
 	public static final Class<ShipPartComponent> shipPartComponentClass = ShipPartComponent.class;
 	public static final Class<WorldWrapTeleportComponent> worldWrapTeleportComponentClass = WorldWrapTeleportComponent.class;
 	
-	public static ShipPartComponent getShipComponent(Entity e) {
+	public static ShipPartComponent getShipPartComponent(Entity e) {
 		return e.getComponent(shipPartComponentClass);
 	}
 	
