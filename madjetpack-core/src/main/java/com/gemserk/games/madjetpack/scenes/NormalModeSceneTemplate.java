@@ -62,6 +62,7 @@ import com.gemserk.games.madjetpack.components.RenderScriptComponent;
 import com.gemserk.games.madjetpack.components.ShipPartComponent;
 import com.gemserk.games.madjetpack.components.TargetComponent;
 import com.gemserk.games.madjetpack.components.WeaponComponent;
+import com.gemserk.games.madjetpack.components.WorldWrapTeleportComponent;
 import com.gemserk.games.madjetpack.entities.Groups;
 import com.gemserk.games.madjetpack.entities.Tags;
 import com.gemserk.games.madjetpack.systems.RenderScriptSystem;
@@ -126,21 +127,21 @@ public class NormalModeSceneTemplate {
 
 			// apply jetpack
 			body.applyForceToCenter(new Vector2(0f, 15f).mul(movementDirection.y));
-			
+
 			if (Gdx.input.isButtonPressed(Buttons.RIGHT)) {
-				
+
 				ShipPartComponent shipComponent = GameComponents.getShipComponent(e);
 				Entity part = shipComponent.getPart();
 				Joint joint = shipComponent.getJoint();
 				if (part == null)
 					return;
-				
+
 				shipComponent.setPart(null);
 				shipComponent.setJoint(null);
-				
+
 				physicsWorld.destroyJoint(joint);
 			}
-		
+
 		}
 
 	}
@@ -223,6 +224,7 @@ public class NormalModeSceneTemplate {
 			));
 			entity.addComponent(new ContainerComponent());
 			entity.addComponent(new ShipPartComponent());
+			entity.addComponent(new WorldWrapTeleportComponent());
 
 		}
 	}
@@ -311,7 +313,8 @@ public class NormalModeSceneTemplate {
 			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
 
 			entity.addComponent(new ScriptComponent(new BulletScript(direction), new RemoveBulletScript(worldBounds, bulletDuration)));
-
+			entity.addComponent(new WorldWrapTeleportComponent());
+			
 		}
 
 	}
@@ -712,7 +715,6 @@ public class NormalModeSceneTemplate {
 
 			shipComponent.setPart(e);
 			shipComponent.setJoint(joint);
-
 		}
 
 	}
@@ -755,6 +757,8 @@ public class NormalModeSceneTemplate {
 			entity.addComponent(new PhysicsComponent(new PhysicsImpl(body)));
 			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
 			entity.addComponent(new ScriptComponent(new AttachShipPartToCharacterScript()));
+			entity.addComponent(new WorldWrapTeleportComponent());
+			
 		}
 
 	}
@@ -818,12 +822,12 @@ public class NormalModeSceneTemplate {
 		scene.addUpdateSystem(new ReflectionRegistratorEventSystem(eventManager));
 		scene.addUpdateSystem(new OwnerSystem());
 
-		scene.addUpdateSystem(new EntityProcessingSystem(SpatialComponent.class) {
+		scene.addUpdateSystem(new EntityProcessingSystem(Components.spatialComponentClass, GameComponents.worldWrapTeleportComponentClass) {
 			@Override
 			protected void process(Entity e) {
 				SpatialComponent spatialComponent = e.getComponent(SpatialComponent.class);
 				Spatial spatial = spatialComponent.getSpatial();
-
+				
 				float limit = worldBounds.getX() + worldBounds.getWidth();
 
 				if (spatial.getX() > limit) {
@@ -890,10 +894,10 @@ public class NormalModeSceneTemplate {
 		// .put("spatial", new SpatialImpl(7f, 3f, 0.5f, 0.5f, 0f)) //
 		// );
 
-//		entityFactory.instantiate(alienSpawnerTemplate, new ParametersWrapper() //
-//				.put("x", 7f) //
-//				.put("y", 3f) //
-//				);
+		// entityFactory.instantiate(alienSpawnerTemplate, new ParametersWrapper() //
+		// .put("x", 7f) //
+		// .put("y", 3f) //
+		// );
 
 		entityFactory.instantiate(shipPartTemplate, new ParametersWrapper() //
 				.put("position", new Vector2(worldBounds.getWidth() * 0.25f, 5.2f)) //
