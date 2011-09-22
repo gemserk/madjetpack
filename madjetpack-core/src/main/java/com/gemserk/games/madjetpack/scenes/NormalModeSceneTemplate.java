@@ -597,7 +597,7 @@ public class NormalModeSceneTemplate {
 		}
 
 	}
-
+	
 	class CameraTemplate extends EntityTemplateImpl {
 
 		@Override
@@ -607,6 +607,7 @@ public class NormalModeSceneTemplate {
 
 			entity.addComponent(new CameraComponent(camera, libgdxCamera));
 			entity.addComponent(new ScriptComponent(new UpdateCameraScript()));
+			entity.addComponent(new TagComponent(Tags.MainCamera));
 		}
 	}
 
