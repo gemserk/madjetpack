@@ -3,6 +3,7 @@ package com.gemserk.games.madjetpack.scenes;
 import java.util.ArrayList;
 
 import com.artemis.Entity;
+import com.artemis.EntityProcessingSystem;
 import com.artemis.World;
 import com.artemis.utils.ImmutableBag;
 import com.badlogic.gdx.Gdx;
@@ -39,6 +40,8 @@ import com.gemserk.commons.gdx.GlobalTime;
 import com.gemserk.commons.gdx.box2d.BodyBuilder;
 import com.gemserk.commons.gdx.box2d.Contacts;
 import com.gemserk.commons.gdx.box2d.Contacts.Contact;
+import com.gemserk.commons.gdx.camera.Camera;
+import com.gemserk.commons.gdx.camera.CameraRestrictedImpl;
 import com.gemserk.commons.gdx.camera.Libgdx2dCamera;
 import com.gemserk.commons.gdx.camera.Libgdx2dCameraTransformImpl;
 import com.gemserk.commons.gdx.games.PhysicsImpl;
@@ -49,6 +52,8 @@ import com.gemserk.componentsengine.utils.Parameters;
 import com.gemserk.componentsengine.utils.ParametersWrapper;
 import com.gemserk.componentsengine.utils.timers.CountDownTimer;
 import com.gemserk.games.madjetpack.GameInformation;
+import com.gemserk.games.madjetpack.components.CameraComponent;
+import com.gemserk.games.madjetpack.components.Components;
 import com.gemserk.games.madjetpack.components.RenderScriptComponent;
 import com.gemserk.games.madjetpack.components.TargetComponent;
 import com.gemserk.games.madjetpack.components.WeaponComponent;
@@ -578,6 +583,33 @@ public class NormalModeSceneTemplate {
 		}
 	}
 
+	static class UpdateCameraScript extends ScriptJavaImpl {
+
+		@Override
+		public void update(World world, Entity e) {
+			CameraComponent cameraComponent = Components.cameraComponent(e);
+
+			Camera camera = cameraComponent.getCamera();
+			Libgdx2dCamera libgdx2dCamera = cameraComponent.getLibgdx2dCamera();
+
+			libgdx2dCamera.zoom(camera.getZoom());
+			libgdx2dCamera.move(camera.getX(), camera.getY());
+		}
+
+	}
+
+	class CameraTemplate extends EntityTemplateImpl {
+
+		@Override
+		public void apply(Entity entity) {
+			Camera camera = parameters.get("camera");
+			Libgdx2dCamera libgdxCamera = parameters.get("libgdxCamera");
+
+			entity.addComponent(new CameraComponent(camera, libgdxCamera));
+			entity.addComponent(new ScriptComponent(new UpdateCameraScript()));
+		}
+	}
+
 	static class Layers {
 
 		static final String World = "World";
@@ -594,6 +626,7 @@ public class NormalModeSceneTemplate {
 	EntityTemplate weaponTemplate = new WeaponTemplate();
 	EntityTemplate enemyTemplate = new AlienTemplate();
 	EntityTemplate alienSpawnerTemplate = new AlienSpawnerTemplate();
+	EntityTemplate cameraTemplate = new CameraTemplate();
 
 	private BodyBuilder bodyBuilder;
 	private EntityFactory entityFactory;
@@ -605,14 +638,18 @@ public class NormalModeSceneTemplate {
 	public void apply(WorldWrapper scene) {
 		final EventManager eventManager = new EventManagerImpl();
 
+		final Rectangle worldBounds = new Rectangle(0, 0, 20f, 30f);
+
+		Camera gameCamera = new CameraRestrictedImpl(0, 0, 48f, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), worldBounds);
+
 		com.badlogic.gdx.physics.box2d.World physicsWorld = new com.badlogic.gdx.physics.box2d.World(new Vector2(0f, -10f), false);
 		bodyBuilder = new BodyBuilder(physicsWorld);
 
 		RenderLayers renderLayers = new RenderLayers();
 
-		Libgdx2dCamera worldCamera = new Libgdx2dCameraTransformImpl();
+		Libgdx2dCamera worldCamera = new Libgdx2dCameraTransformImpl(Gdx.graphics.getWidth() * 0.5f, Gdx.graphics.getHeight() * 0.5f);
 
-		worldCamera.zoom(48f);
+		// worldCamera.zoom(48f);
 
 		renderLayers.add(Layers.World, new RenderLayerSpriteBatchImpl(-100, 100, worldCamera));
 
@@ -621,6 +658,24 @@ public class NormalModeSceneTemplate {
 		scene.addUpdateSystem(new PhysicsSystem(physicsWorld));
 		scene.addUpdateSystem(new ReflectionRegistratorEventSystem(eventManager));
 		scene.addUpdateSystem(new OwnerSystem());
+
+		scene.addUpdateSystem(new EntityProcessingSystem(SpatialComponent.class) {
+			@Override
+			protected void process(Entity e) {
+				SpatialComponent spatialComponent = e.getComponent(SpatialComponent.class);
+				Spatial spatial = spatialComponent.getSpatial();
+
+				float limit = worldBounds.getX() + worldBounds.getWidth();
+
+				if (spatial.getX() > limit) {
+					spatial.setPosition(spatial.getX() - limit, spatial.getY());
+				}
+
+				if (spatial.getX() < 0f) {
+					spatial.setPosition(spatial.getX() + limit, spatial.getY());
+				}
+			}
+		});
 
 		// scene.addRenderSystem(new SpriteUpdateSystem());
 		// scene.addRenderSystem(new RenderableSystem(renderLayers));
@@ -673,6 +728,11 @@ public class NormalModeSceneTemplate {
 		entityFactory.instantiate(alienSpawnerTemplate, new ParametersWrapper() //
 				.put("x", 7f) //
 				.put("y", 3f) //
+				);
+
+		entityFactory.instantiate(cameraTemplate, new ParametersWrapper() //
+				.put("camera", gameCamera) //
+				.put("libgdxCamera", worldCamera) //
 				);
 
 		Gdx.app.log(GameInformation.name, "Applying scene template...");
