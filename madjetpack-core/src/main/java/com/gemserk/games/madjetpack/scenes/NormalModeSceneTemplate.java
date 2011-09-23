@@ -412,7 +412,7 @@ public class NormalModeSceneTemplate {
 							.maskBits((short) (CollisionBits.ALL & ~CollisionBits.Character)) //
 							.friction(0f) //
 							.restitution(0.6f) //
-							.boxShape(width * 0.5f, height * 0.5f)) //
+							.boxShape(width * 0.5f, height * 0.5f), "BulletBody") //
 					.position(position.x, position.y) //
 					.type(BodyType.DynamicBody) //
 					.bullet() //
@@ -424,7 +424,11 @@ public class NormalModeSceneTemplate {
 			entity.addComponent(new PhysicsComponent(new PhysicsImpl(body)));
 			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
 
-			entity.addComponent(new ScriptComponent(new BulletScript(direction), new RemoveBulletScript(worldBounds, bulletDuration)));
+			entity.addComponent(new ScriptComponent(new BulletScript(direction), 
+					new RemoveBulletScript(worldBounds, bulletDuration),
+					new DisablePlatformCollisionWhenGoingUpScript("BulletBody", (short)(CollisionBits.ALL & ~CollisionBits.Character), 
+							(short)(CollisionBits.ALL & ~CollisionBits.Platform & ~CollisionBits.Character))
+			));
 			entity.addComponent(new WorldWrapTeleportComponent());
 
 		}
@@ -1193,17 +1197,21 @@ public class NormalModeSceneTemplate {
 				.put("libgdxCamera", worldCamera) //
 				);
 
-		try {
-			entityFactory.instantiate(xbox360ControllerTemplate, new ParametersWrapper() //
-					.put("controller", characterController) //
-					);
-		} catch (Exception e) {
-			System.out.println(e.getMessage());
+		entityFactory.instantiate(keyboardControllerTemplate, new ParametersWrapper() //
+				.put("controller", characterController) //
+				);
 
-			entityFactory.instantiate(keyboardControllerTemplate, new ParametersWrapper() //
-					.put("controller", characterController) //
-					);
-		}
+		// try {
+		// entityFactory.instantiate(xbox360ControllerTemplate, new ParametersWrapper() //
+		// .put("controller", characterController) //
+		// );
+		// } catch (Exception e) {
+		// System.out.println(e.getMessage());
+		//
+		// entityFactory.instantiate(keyboardControllerTemplate, new ParametersWrapper() //
+		// .put("controller", characterController) //
+		// );
+		// }
 
 		Gdx.app.log(GameInformation.name, "Applying scene template...");
 	}
