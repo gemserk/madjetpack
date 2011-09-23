@@ -7,6 +7,7 @@ public class GameComponents {
 	public static final Class<ShipPartComponent> shipPartComponentClass = ShipPartComponent.class;
 	public static final Class<WorldWrapTeleportComponent> worldWrapTeleportComponentClass = WorldWrapTeleportComponent.class;
 	public static final Class<BoundsComponent> boundsComponentClass = BoundsComponent.class;
+	public static final Class<ControllerComponent> controllerComponentClass = ControllerComponent.class;
 	
 	public static ShipPartComponent shipPartComponent(Entity e) {
 		return e.getComponent(shipPartComponentClass);
@@ -18,6 +19,10 @@ public class GameComponents {
 	
 	public static BoundsComponent boundsComponent(Entity e) {
 		return e.getComponent(boundsComponentClass);
+	}	
+	
+	public static ControllerComponent controllerComponent(Entity e) {
+		return e.getComponent(controllerComponentClass);
 	}	
 
 }

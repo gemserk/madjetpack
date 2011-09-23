@@ -2,6 +2,10 @@ package com.gemserk.games.madjetpack.scenes;
 
 import java.util.ArrayList;
 
+import net.java.games.input.Component;
+import net.java.games.input.Controller;
+import net.java.games.input.ControllerEnvironment;
+
 import com.artemis.Entity;
 import com.artemis.EntityProcessingSystem;
 import com.artemis.World;
@@ -58,6 +62,7 @@ import com.gemserk.games.madjetpack.GameInformation;
 import com.gemserk.games.madjetpack.components.BoundsComponent;
 import com.gemserk.games.madjetpack.components.CameraComponent;
 import com.gemserk.games.madjetpack.components.Components;
+import com.gemserk.games.madjetpack.components.ControllerComponent;
 import com.gemserk.games.madjetpack.components.GameComponents;
 import com.gemserk.games.madjetpack.components.RenderScriptComponent;
 import com.gemserk.games.madjetpack.components.ShipPartComponent;
@@ -66,6 +71,7 @@ import com.gemserk.games.madjetpack.components.WeaponComponent;
 import com.gemserk.games.madjetpack.components.WorldWrapTeleportComponent;
 import com.gemserk.games.madjetpack.entities.Groups;
 import com.gemserk.games.madjetpack.entities.Tags;
+import com.gemserk.games.madjetpack.scripts.controllers.CharacterController;
 import com.gemserk.games.madjetpack.systems.RenderScriptSystem;
 import com.gemserk.resources.ResourceManager;
 
@@ -104,31 +110,132 @@ public class NormalModeSceneTemplate {
 
 	}
 
+	class KeyboardControllerScript extends ScriptJavaImpl {
+
+		@Override
+		public void update(World world, Entity e) {
+
+			ControllerComponent controllerComponent = GameComponents.controllerComponent(e);
+
+			Vector2 movementDirection = new Vector2(0f, 0f);
+
+			if (Gdx.input.isKeyPressed(Keys.D))
+				movementDirection.x += 1f;
+			else if (Gdx.input.isKeyPressed(Keys.A))
+				movementDirection.x -= 1f;
+
+			if (Gdx.input.isKeyPressed(Keys.W))
+				movementDirection.y += 1f;
+
+			controllerComponent.characterController.horizontalDirection = movementDirection.x;
+			controllerComponent.characterController.jetpacPower = movementDirection.y;
+
+		}
+
+	}
+
+	class KeyboardControllerTemplate extends EntityTemplateImpl {
+
+		@Override
+		public void apply(Entity entity) {
+			CharacterController characterController = parameters.get("controller");
+			entity.addComponent(new ControllerComponent(characterController));
+			entity.addComponent(new ScriptComponent(new KeyboardControllerScript()));
+		}
+
+	}
+
+	class Xbox360ControllerScript extends ScriptJavaImpl {
+
+		private static final String controllerName = "Microsoft X-Box 360 pad";
+		private Controller controller;
+
+		public Xbox360ControllerScript() {
+			ControllerEnvironment controllerEnvironment = ControllerEnvironment.getDefaultEnvironment();
+			Controller[] controllers = controllerEnvironment.getControllers();
+
+			if (controllers.length == 0)
+				throw new RuntimeException("Xbox360 Controller not found");
+
+			for (int i = 0; i < controllers.length; i++) {
+				Controller controller = controllers[0];
+				if (controllerName.equals(controller.getName()))
+					this.controller = controller;
+			}
+
+			if (this.controller == null)
+				throw new RuntimeException("Xbox360 Controller not found");
+		}
+
+		@Override
+		public void update(World world, Entity e) {
+
+			controller.poll();
+
+			Component[] components = controller.getComponents();
+			ControllerComponent controllerComponent = GameComponents.controllerComponent(e);
+			CharacterController characterController = controllerComponent.characterController;
+
+			characterController.horizontalDirection = 0f;
+			characterController.jetpacPower = 0f;
+
+			for (int i = 0; i < components.length; i++) {
+
+				Component component = components[i];
+
+				float value = component.getPollData();
+
+				if ("x".equals(component.getName()))
+					characterController.horizontalDirection = value;
+
+				if ("y".equals(component.getName()) && value < 0f)
+					characterController.jetpacPower = -value;
+
+			}
+
+		}
+
+	}
+
+	class Xbox360ControllerTemplate extends EntityTemplateImpl {
+
+		@Override
+		public void apply(Entity entity) {
+			CharacterController characterController = parameters.get("controller");
+			entity.addComponent(new ControllerComponent(characterController));
+			entity.addComponent(new ScriptComponent(new Xbox360ControllerScript()));
+		}
+
+	}
+
 	class CharacterControllerScript extends ScriptJavaImpl {
 
 		@Override
 		public void update(World world, Entity e) {
 
-			Vector2 movementDirection = new Vector2(0f, 0f);
+			ControllerComponent controllerComponent = GameComponents.controllerComponent(e);
+			CharacterController characterController = controllerComponent.characterController;
 
-			if (Gdx.input.isKeyPressed(Keys.D)) {
-				movementDirection.x += 1f;
-			} else if (Gdx.input.isKeyPressed(Keys.A)) {
-				movementDirection.x -= 1f;
-			}
-
-			if (Gdx.input.isKeyPressed(Keys.W)) {
-				movementDirection.y += 1f;
-			}
+			// Vector2 movementDirection = new Vector2(0f, 0f);
+			//
+			// if (Gdx.input.isKeyPressed(Keys.D)) {
+			// movementDirection.x += 1f;
+			// } else if (Gdx.input.isKeyPressed(Keys.A)) {
+			// movementDirection.x -= 1f;
+			// }
+			//
+			// if (Gdx.input.isKeyPressed(Keys.W)) {
+			// movementDirection.y += 1f;
+			// }
 
 			PhysicsComponent physicsComponent = Components.physicsComponent(e);
 
 			Body body = physicsComponent.getBody();
 
-			body.applyForceToCenter(new Vector2(5f, 0f).mul(movementDirection.x));
+			body.applyForceToCenter(new Vector2(5f, 0f).mul(characterController.horizontalDirection));
 
 			// apply jetpack
-			body.applyForceToCenter(new Vector2(0f, 15f).mul(movementDirection.y));
+			body.applyForceToCenter(new Vector2(0f, 15f).mul(characterController.jetpacPower));
 
 		}
 
@@ -199,6 +306,8 @@ public class NormalModeSceneTemplate {
 		@Override
 		public void apply(Entity entity) {
 
+			CharacterController characterController = parameters.get("controller");
+
 			float width = 0.5f;
 			float height = 1.5f;
 
@@ -220,6 +329,7 @@ public class NormalModeSceneTemplate {
 			entity.addComponent(new TagComponent(Tags.Character));
 			entity.addComponent(new PhysicsComponent(new PhysicsImpl(body)));
 			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
+			entity.addComponent(new ControllerComponent(characterController));
 			entity.addComponent(new ScriptComponent(new CharacterControllerScript(), //
 					new DisablePlatformCollisionWhenGoingUpScript(), //
 					new LimitLinearVelocityScript(50f) //
@@ -495,7 +605,7 @@ public class NormalModeSceneTemplate {
 			// if target not on world
 			if (target == null)
 				return;
-			
+
 			Entity worldEntity = world.getTagManager().getEntity(Tags.World);
 			BoundsComponent boundsComponent = GameComponents.boundsComponent(worldEntity);
 
@@ -507,10 +617,10 @@ public class NormalModeSceneTemplate {
 
 			direction.set(targetSpatial.getX(), targetSpatial.getY());
 			direction.sub(spatial.getX(), spatial.getY());
-			
+
 			if (direction.len() > boundsComponent.getBounds().getWidth() * 0.5f)
 				direction.x = -direction.x;
-			
+
 			direction.nor();
 
 			force.set(direction);
@@ -577,7 +687,7 @@ public class NormalModeSceneTemplate {
 			entity.addComponent(new ScriptComponent(new AntiGravityScript(), new FollowEntityScript(), new LimitLinearVelocityScript(2f), new RemoveWhenBulletCollision()));
 			entity.addComponent(new TargetComponent(Tags.Character));
 			entity.addComponent(new WorldWrapTeleportComponent());
-			
+
 			// entity.addComponent(new LinearVelocityLimitComponent(2f));
 
 		}
@@ -909,7 +1019,7 @@ public class NormalModeSceneTemplate {
 		}
 
 	}
-	
+
 	class WorldTemplate extends EntityTemplateImpl {
 
 		@Override
@@ -918,7 +1028,7 @@ public class NormalModeSceneTemplate {
 			entity.addComponent(new TagComponent(Tags.World));
 			entity.addComponent(new BoundsComponent(bounds));
 		}
-		
+
 	}
 
 	static class Layers {
@@ -929,7 +1039,7 @@ public class NormalModeSceneTemplate {
 
 	// @Inject
 	ResourceManager<String> resourceManager;
-	
+
 	EntityTemplate worldTemplate = new WorldTemplate();
 
 	EntityTemplate box2dDebugRendererTemplate = new Box2dDebugRendererTemplate();
@@ -949,6 +1059,9 @@ public class NormalModeSceneTemplate {
 
 	EntityTemplate shipTemplate = new ShipTemplate();
 
+	EntityTemplate keyboardControllerTemplate = new KeyboardControllerTemplate();
+	EntityTemplate xbox360ControllerTemplate = new Xbox360ControllerTemplate();
+
 	private BodyBuilder bodyBuilder;
 	private EntityFactory entityFactory;
 
@@ -964,7 +1077,7 @@ public class NormalModeSceneTemplate {
 		final EventManager eventManager = new EventManagerImpl();
 
 		final Rectangle worldBounds = new Rectangle(0, 0, 20f, 20f);
-		
+
 		Camera gameCamera = new CameraRestrictedImpl(0, 0, 48f, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), worldBounds);
 
 		physicsWorld = new com.badlogic.gdx.physics.box2d.World(new Vector2(0f, -10f), false);
@@ -1009,10 +1122,12 @@ public class NormalModeSceneTemplate {
 
 		scene.init();
 
+		CharacterController characterController = new CharacterController();
+
 		entityFactory = new EntityFactoryImpl(scene.getWorld());
-		
+
 		entityFactory.instantiate(worldTemplate, new ParametersWrapper().put("bounds", worldBounds));
-		
+
 		entityFactory.instantiate(box2dDebugRendererTemplate, new ParametersWrapper() //
 				.put("camera", worldCamera) //
 				.put("physicsWorld", physicsWorld) //
@@ -1048,7 +1163,7 @@ public class NormalModeSceneTemplate {
 				.put("height", 0.2f) //
 				);
 
-		Entity character = entityFactory.instantiate(characterTemplate);
+		Entity character = entityFactory.instantiate(characterTemplate, new ParametersWrapper().put("controller", characterController));
 
 		entityFactory.instantiate(weaponTemplate, new ParametersWrapper() //
 				.put("position", new Vector2(3f, 2f)) //
@@ -1077,6 +1192,18 @@ public class NormalModeSceneTemplate {
 				.put("camera", gameCamera) //
 				.put("libgdxCamera", worldCamera) //
 				);
+
+		try {
+			entityFactory.instantiate(xbox360ControllerTemplate, new ParametersWrapper() //
+					.put("controller", characterController) //
+					);
+		} catch (Exception e) {
+			System.out.println(e.getMessage());
+
+			entityFactory.instantiate(keyboardControllerTemplate, new ParametersWrapper() //
+					.put("controller", characterController) //
+					);
+		}
 
 		Gdx.app.log(GameInformation.name, "Applying scene template...");
 	}
