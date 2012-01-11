@@ -22,6 +22,7 @@ import com.badlogic.gdx.physics.box2d.Filter;
 import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.Joint;
 import com.gemserk.commons.artemis.WorldWrapper;
+import com.gemserk.commons.artemis.components.Components;
 import com.gemserk.commons.artemis.components.ContainerComponent;
 import com.gemserk.commons.artemis.components.OwnerComponent;
 import com.gemserk.commons.artemis.components.PhysicsComponent;
@@ -61,7 +62,6 @@ import com.gemserk.componentsengine.utils.timers.CountDownTimer;
 import com.gemserk.games.madjetpack.GameInformation;
 import com.gemserk.games.madjetpack.components.BoundsComponent;
 import com.gemserk.games.madjetpack.components.CameraComponent;
-import com.gemserk.games.madjetpack.components.Components;
 import com.gemserk.games.madjetpack.components.ControllerComponent;
 import com.gemserk.games.madjetpack.components.GameComponents;
 import com.gemserk.games.madjetpack.components.RenderScriptComponent;
@@ -228,7 +228,7 @@ public class NormalModeSceneTemplate {
 			// movementDirection.y += 1f;
 			// }
 
-			PhysicsComponent physicsComponent = Components.physicsComponent(e);
+			PhysicsComponent physicsComponent = Components.getPhysicsComponent(e);
 
 			Body body = physicsComponent.getBody();
 
@@ -748,7 +748,7 @@ public class NormalModeSceneTemplate {
 
 		@Override
 		public void update(World world, Entity e) {
-			CameraComponent cameraComponent = Components.cameraComponent(e);
+			CameraComponent cameraComponent = GameComponents.cameraComponent(e);
 			Camera camera = cameraComponent.getCamera();
 			Libgdx2dCamera libgdx2dCamera = cameraComponent.getLibgdx2dCamera();
 			libgdx2dCamera.zoom(camera.getZoom());
@@ -773,17 +773,17 @@ public class NormalModeSceneTemplate {
 		@Override
 		public void apply(Entity e) {
 			super.apply(e);
-			ScriptComponent scriptComponent = Components.scriptComponent(e);
+			ScriptComponent scriptComponent = Components.getScriptComponent(e);
 			scriptComponent.getScripts().add(new ScriptJavaImpl() {
 				@Override
 				public void update(World world, Entity e) {
 					Entity character = world.getTagManager().getEntity(Tags.Character);
 					if (character == null)
 						return;
-					SpatialComponent spatialComponent = Components.spatialComponent(character);
+					SpatialComponent spatialComponent = Components.getSpatialComponent(character);
 					Spatial spatial = spatialComponent.getSpatial();
 
-					CameraComponent cameraComponent = Components.cameraComponent(e);
+					CameraComponent cameraComponent = GameComponents.cameraComponent(e);
 					Camera camera = cameraComponent.getCamera();
 
 					camera.setPosition(spatial.getX(), spatial.getY());
@@ -807,7 +807,7 @@ public class NormalModeSceneTemplate {
 			if (shipComponent.getPart() != null)
 				return;
 
-			PhysicsComponent physicsComponent = Components.physicsComponent(e);
+			PhysicsComponent physicsComponent = Components.getPhysicsComponent(e);
 			Contacts contacts = physicsComponent.getContact();
 
 			if (!contacts.isInContact())
@@ -830,7 +830,7 @@ public class NormalModeSceneTemplate {
 			if (!inContactWithCharacter)
 				return;
 
-			SpatialComponent spatialComponent = Components.spatialComponent(e);
+			SpatialComponent spatialComponent = Components.getSpatialComponent(e);
 			Spatial spatial = spatialComponent.getSpatial();
 
 			entityFactory.instantiate(attachedShipPartTemplate, new ParametersWrapper() //
@@ -918,7 +918,7 @@ public class NormalModeSceneTemplate {
 			entity.addComponent(new SpatialComponent(new SpatialPhysicsImpl(body, width, height)));
 			entity.addComponent(new ScriptComponent(new DisablePlatformCollisionWhenGoingUpScript("ShipPartBody", maskBits, (short) (CollisionBits.WorldBound | CollisionBits.Alien))));
 
-			PhysicsComponent characterPhysicsComponent = Components.physicsComponent(owner);
+			PhysicsComponent characterPhysicsComponent = Components.getPhysicsComponent(owner);
 
 			Joint joint = jointBuilder.ropeJointBuilder() //
 					.bodyA(body, 0f, 0f) //
@@ -950,7 +950,7 @@ public class NormalModeSceneTemplate {
 			if (shipPart == null)
 				return;
 
-			PhysicsComponent physicsComponent = Components.physicsComponent(e);
+			PhysicsComponent physicsComponent = Components.getPhysicsComponent(e);
 			Contacts contacts = physicsComponent.getContact();
 
 			if (!contacts.isInContact())
