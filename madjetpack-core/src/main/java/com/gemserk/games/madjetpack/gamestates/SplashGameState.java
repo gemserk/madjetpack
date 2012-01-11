@@ -79,7 +79,7 @@ public class SplashGameState extends com.gemserk.commons.gdx.gamestates.LoadingG
 		
 		Color endColor = new Color(colors[new Random().nextInt(colors.length)]);
 
-		Synchronizers.transition(blurColor, Transitions.transitionBuilder(new Color(1f, 0f, 0f, 0f)).end(endColor).time(1f));
+		Synchronizers.transition(Transitions.transition(blurColor).start(1f, 0f, 0f, 0f).endObject(1f, endColor).build());
 
 		TaskQueue taskQueue = super.getTaskQueue();
 

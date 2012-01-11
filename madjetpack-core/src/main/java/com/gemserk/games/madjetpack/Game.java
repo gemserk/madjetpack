@@ -12,18 +12,18 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.Vector2;
+import com.gemserk.animation4j.commons.values.converters.CommonConverters;
 import com.gemserk.animation4j.converters.Converters;
 import com.gemserk.animation4j.gdx.converters.LibgdxConverters;
 import com.gemserk.commons.artemis.events.EventManager;
 import com.gemserk.commons.artemis.events.EventManagerImpl;
 import com.gemserk.commons.artemis.events.reflection.EventListenerReflectionRegistrator;
-import com.gemserk.commons.gdx.GameTransitions.ScreenTransition;
-import com.gemserk.commons.gdx.GameTransitions.TransitionHandler;
-import com.gemserk.commons.gdx.GameTransitions.TransitionScreen;
 import com.gemserk.commons.gdx.GlobalTime;
 import com.gemserk.commons.gdx.Screen;
 import com.gemserk.commons.gdx.ScreenImpl;
 import com.gemserk.commons.gdx.graphics.SpriteBatchUtils;
+import com.gemserk.commons.gdx.screens.transitions.TransitionBuilder;
+import com.gemserk.commons.values.FloatValue;
 import com.gemserk.componentsengine.input.InputDevicesMonitorImpl;
 import com.gemserk.componentsengine.input.LibgdxInputMappingBuilder;
 import com.gemserk.componentsengine.utils.Parameters;
@@ -33,8 +33,6 @@ import com.gemserk.games.madjetpack.gamestates.PlayGameState;
 import com.gemserk.games.madjetpack.gamestates.SplashGameState;
 import com.gemserk.games.madjetpack.preferences.GamePreferences;
 import com.gemserk.games.madjetpack.resources.GameResources;
-import com.gemserk.games.madjetpack.transitions.FadeInTransition;
-import com.gemserk.games.madjetpack.transitions.FadeOutTransition;
 import com.gemserk.util.ScreenshotSaver;
 
 public class Game extends com.gemserk.commons.gdx.Game {
@@ -104,7 +102,7 @@ public class Game extends com.gemserk.commons.gdx.Game {
 	public void create() {
 		Converters.register(Vector2.class, LibgdxConverters.vector2());
 		Converters.register(Color.class, LibgdxConverters.color());
-		Converters.register(Float.class, Converters.floatValue());
+		Converters.register(FloatValue.class, CommonConverters.floatValue());
 
 		gameData = new ParametersWrapper();
 
@@ -199,89 +197,6 @@ public class Game extends com.gemserk.commons.gdx.Game {
 
 	private boolean withTransition = false;
 	private Screen playGameScreen;
-
-	public class TransitionBuilder {
-
-		private final Screen screen;
-		private final Game game;
-
-		float leaveTime;
-		float enterTime;
-		boolean shouldDisposeCurrentScreen;
-
-		TransitionHandler leaveTransitionHandler = new TransitionHandler();
-
-		public TransitionBuilder leaveTime(float leaveTime) {
-			this.leaveTime = leaveTime;
-			return this;
-		}
-
-		public TransitionBuilder enterTime(float enterTime) {
-			this.enterTime = enterTime;
-			return this;
-		}
-
-		public TransitionBuilder leaveTime(int leaveTime) {
-			return leaveTime((float) leaveTime * 0.001f);
-		}
-
-		public TransitionBuilder enterTime(int enterTime) {
-			return enterTime((float) enterTime * 0.001f);
-		}
-
-		public TransitionBuilder disposeCurrent() {
-			this.shouldDisposeCurrentScreen = true;
-			return this;
-		}
-
-		public TransitionBuilder disposeCurrent(boolean disposeCurrent) {
-			this.shouldDisposeCurrentScreen = disposeCurrent;
-			return this;
-		}
-
-		public TransitionBuilder leaveTransitionHandler(TransitionHandler transitionHandler) {
-			this.leaveTransitionHandler = transitionHandler;
-			return this;
-		}
-
-		public TransitionBuilder parameter(String key, Object value) {
-			screen.getParameters().put(key, value);
-			return this;
-		}
-
-		public TransitionBuilder(final Game game, final Screen screen) {
-			this.game = game;
-			this.screen = screen;
-			this.leaveTransitionHandler = new TransitionHandler();
-			this.leaveTime = 0.25f;
-			this.enterTime = 0.25f;
-		}
-
-		public void start() {
-			if (withTransition)
-				return;
-			withTransition = true;
-			final Screen currentScreen = game.getScreen();
-			game.setScreen(new TransitionScreen(new ScreenTransition( //
-					new FadeOutTransition(resourceManager, currentScreen, leaveTime, leaveTransitionHandler), //
-					new FadeInTransition(resourceManager, screen, enterTime, new TransitionHandler() {
-						public void onEnd() {
-							withTransition = false;
-							// disposes current transition screen, not previous screen.
-							game.setScreen(screen, true);
-							if (shouldDisposeCurrentScreen)
-								currentScreen.dispose();
-						};
-					}))) {
-				@Override
-				public void resume() {
-					super.resume();
-					Gdx.input.setCatchBackKey(true);
-				}
-			});
-		}
-
-	}
 
 	public TransitionBuilder transition(Screen screen) {
 		return new TransitionBuilder(this, screen);

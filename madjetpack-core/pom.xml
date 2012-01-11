@@ -55,21 +55,6 @@
 			<artifactId>commons-gdx-resources</artifactId>
 			<version>${commons.gdx.version}</version>
 		</dependency>
-		<dependency>
-			<groupId>com.gemserk.datastore</groupId>
-			<artifactId>datastore-core</artifactId>
-			<version>${datastore.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>com.dmurph</groupId>
-			<artifactId>JGoogleAnalyticsTracker</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>net.java.jinput</groupId>
-			<artifactId>jinput</artifactId>
-			<version>2.0.5</version>
-			<scope>provided</scope>
-		</dependency>
 	</dependencies>
 
 </project>

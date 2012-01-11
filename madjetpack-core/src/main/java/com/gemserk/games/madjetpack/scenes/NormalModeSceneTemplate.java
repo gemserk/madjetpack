@@ -2,10 +2,6 @@ package com.gemserk.games.madjetpack.scenes;
 
 import java.util.ArrayList;
 
-import net.java.games.input.Component;
-import net.java.games.input.Controller;
-import net.java.games.input.ControllerEnvironment;
-
 import com.artemis.Entity;
 import com.artemis.EntityProcessingSystem;
 import com.artemis.World;
@@ -145,68 +141,68 @@ public class NormalModeSceneTemplate {
 
 	}
 
-	class Xbox360ControllerScript extends ScriptJavaImpl {
+//	class Xbox360ControllerScript extends ScriptJavaImpl {
+//
+//		private static final String controllerName = "Microsoft X-Box 360 pad";
+//		private Controller controller;
+//
+//		public Xbox360ControllerScript() {
+//			ControllerEnvironment controllerEnvironment = ControllerEnvironment.getDefaultEnvironment();
+//			Controller[] controllers = controllerEnvironment.getControllers();
+//
+//			if (controllers.length == 0)
+//				throw new RuntimeException("Xbox360 Controller not found");
+//
+//			for (int i = 0; i < controllers.length; i++) {
+//				Controller controller = controllers[0];
+//				if (controllerName.equals(controller.getName()))
+//					this.controller = controller;
+//			}
+//
+//			if (this.controller == null)
+//				throw new RuntimeException("Xbox360 Controller not found");
+//		}
+//
+//		@Override
+//		public void update(World world, Entity e) {
+//
+//			controller.poll();
+//
+//			Component[] components = controller.getComponents();
+//			ControllerComponent controllerComponent = GameComponents.controllerComponent(e);
+//			CharacterController characterController = controllerComponent.characterController;
+//
+//			characterController.horizontalDirection = 0f;
+//			characterController.jetpacPower = 0f;
+//
+//			for (int i = 0; i < components.length; i++) {
+//
+//				Component component = components[i];
+//
+//				float value = component.getPollData();
+//
+//				if ("x".equals(component.getName()))
+//					characterController.horizontalDirection = value;
+//
+//				if ("y".equals(component.getName()) && value < 0f)
+//					characterController.jetpacPower = -value;
+//
+//			}
+//
+//		}
+//
+//	}
 
-		private static final String controllerName = "Microsoft X-Box 360 pad";
-		private Controller controller;
-
-		public Xbox360ControllerScript() {
-			ControllerEnvironment controllerEnvironment = ControllerEnvironment.getDefaultEnvironment();
-			Controller[] controllers = controllerEnvironment.getControllers();
-
-			if (controllers.length == 0)
-				throw new RuntimeException("Xbox360 Controller not found");
-
-			for (int i = 0; i < controllers.length; i++) {
-				Controller controller = controllers[0];
-				if (controllerName.equals(controller.getName()))
-					this.controller = controller;
-			}
-
-			if (this.controller == null)
-				throw new RuntimeException("Xbox360 Controller not found");
-		}
-
-		@Override
-		public void update(World world, Entity e) {
-
-			controller.poll();
-
-			Component[] components = controller.getComponents();
-			ControllerComponent controllerComponent = GameComponents.controllerComponent(e);
-			CharacterController characterController = controllerComponent.characterController;
-
-			characterController.horizontalDirection = 0f;
-			characterController.jetpacPower = 0f;
-
-			for (int i = 0; i < components.length; i++) {
-
-				Component component = components[i];
-
-				float value = component.getPollData();
-
-				if ("x".equals(component.getName()))
-					characterController.horizontalDirection = value;
-
-				if ("y".equals(component.getName()) && value < 0f)
-					characterController.jetpacPower = -value;
-
-			}
-
-		}
-
-	}
-
-	class Xbox360ControllerTemplate extends EntityTemplateImpl {
-
-		@Override
-		public void apply(Entity entity) {
-			CharacterController characterController = parameters.get("controller");
-			entity.addComponent(new ControllerComponent(characterController));
-			entity.addComponent(new ScriptComponent(new Xbox360ControllerScript()));
-		}
-
-	}
+//	class Xbox360ControllerTemplate extends EntityTemplateImpl {
+//
+//		@Override
+//		public void apply(Entity entity) {
+//			CharacterController characterController = parameters.get("controller");
+//			entity.addComponent(new ControllerComponent(characterController));
+//			entity.addComponent(new ScriptComponent(new Xbox360ControllerScript()));
+//		}
+//
+//	}
 
 	class CharacterControllerScript extends ScriptJavaImpl {
 
@@ -1064,7 +1060,7 @@ public class NormalModeSceneTemplate {
 	EntityTemplate shipTemplate = new ShipTemplate();
 
 	EntityTemplate keyboardControllerTemplate = new KeyboardControllerTemplate();
-	EntityTemplate xbox360ControllerTemplate = new Xbox360ControllerTemplate();
+//	EntityTemplate xbox360ControllerTemplate = new Xbox360ControllerTemplate();
 
 	private BodyBuilder bodyBuilder;
 	private EntityFactory entityFactory;
